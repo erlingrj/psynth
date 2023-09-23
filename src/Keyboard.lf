@@ -1,0 +1,75 @@
+target C;
+
+reactor Keyboard {
+    output out: bool
+    
+    preamble {=
+    #include <stdio.h>
+    #include <stdlib.h>
+    #include <libevdev/libevdev.h>
+    #include <fcntl.h>
+
+    void *_key;
+    void *_release;
+    void* read_input(void* arg) {
+        struct libevdev *dev = NULL;
+        int fd;
+        int rc = 1;
+
+        // Open the device (assuming event0 is your keyboard)
+        fd = open("/dev/input/event0", O_RDONLY | O_NONBLOCK);
+        if (fd < 0) {
+            perror("Failed to open device");
+            exit(EXIT_FAILURE);
+        }
+
+        rc = libevdev_new_from_fd(fd, &dev);
+        if (rc < 0) {
+            fprintf(stderr, "Failed to init libevdev: %s\n", strerror(-rc));
+            exit(EXIT_FAILURE);
+        }
+
+        printf("Monitoring %s for key events...\n", libevdev_get_name(dev));
+
+        while (1) {
+            struct input_event ev;
+            rc = libevdev_next_event(dev, LIBEVDEV_READ_FLAG_NORMAL, &ev);
+            if (rc == 0) {
+                if (ev.type == EV_KEY) {
+                    if (ev.value == 1) {
+                        printf("Key %d pressed\n", ev.code);
+                    } else if (ev.value == 0) {
+                        printf("Key %d released\n", ev.code);
+                    }
+                }
+            }
+        }
+        libevdev_free(dev);
+        close(fd);
+        return 0;
+    }
+
+    =}
+
+    physical action key:int;
+    physical action release:int
+    state key_state:bool
+    
+    
+    reaction(startup) -> key, release {=
+        // Start the thread that listens for Enter or Return.
+        _key = key;
+        _release = release;
+        lf_thread_t thread_id;
+        lf_thread_create(&thread_id, &read_input, NULL);        
+    =}
+    
+    
+    reaction(release) -> out {=
+        lf_set(out, false);
+    =}
+    reaction(key) -> out {=
+        lf_set(out, true);
+    =}
+
+}

@@ -1,0 +1,18 @@
+target C {
+    files: ["freq.c","midi.h","common.h", "freq.h"],
+    cmake-include: "include.cmake"
+}
+
+import Sequence, RandomSequence from "Sequence.lf"
+import SoundOutput from "SoundOutput.lf"
+import Synth from "Synth.lf"
+
+
+main reactor {
+    seq = new RandomSequence()
+    synth = new Synth()
+    out = new SoundOutput()
+
+    seq.midi_event -> synth.midi_event
+    synth.samples -> out.samples
+}
