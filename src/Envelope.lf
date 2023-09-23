@@ -1,0 +1,21 @@
+target C;
+
+preamble {=
+    #include "common.h"
+=}
+
+
+// Actually, we need to think a litle harder here.
+// The amplitude envelope is not "stateless" because we have these tiny
+// 128 sample buffers. We need an additional "phase" argument. This is also
+// used inside the oscillator itself. It might suggest that the envelope is
+// intrinsically connected to the oscillator. But I would like to have it
+// as a separate module. 
+
+// Then we need maybe some additional info flowing here. Which is the current phase or t.
+// Maybe we should add a little tag to each sample package?
+reactor AmplitudeEnvelope {
+    input samples_raw:SAMPLE_TYPE[128] 
+    output samples: SAMPLE_TYPE[128]    
+
+}
