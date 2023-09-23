@@ -1,50 +1,37 @@
 target C;
 
+import SineWaveOscillator from "Oscillator.lf"
+
 preamble {=
     #include "midi.h"
     #include "freq.h"
     #include "common.h"
-    #include <math.h>
     #include <string.h>
-    #define AMPLITUDE 1
-    #define PI 3.14159
 =}
 
 reactor Synth {
     input midi_event:int[3]
     output samples : SAMPLE_TYPE[128]
-    state inc:double = 0.000022676;
-    state phase:double = 0;
     state playing:bool = false
-    state frequency:double = 0
 
-    timer t(0, 2900 usec)
-
-    reaction(midi_event) {=
+    osc = new SineWaveOscillator()
+    reaction(midi_event) -> osc.freq {=
             midi_base_msg_t * midi_msg = (midi_base_msg_t *) midi_event->value;
 
             switch (midi_msg->status.type) {
                 case NOTE_OFF:
-                    self->phase = 0;
-                    self->playing = false;
+                    lf_set(osc.freq, 0);
                     break;
                 case NOTE_ON: {
                     midi_note_on_t * note_on = (midi_note_on_t *) midi_msg;
-                    self->frequency = freqs[note_on->pitch];
-                    self->playing = true;
-                    lf_print("Got note %d", note_on->pitch);
+                    lf_set(osc.freq, freqs[note_on->pitch]);
                     break;
                 }
             }
     =}
-    reaction(t) -> samples {=
-        
-        if (self->playing) {
-            for (int i = 0; i<SAMPLE_SIZE; i++) {
-                samples->value[i] = sin(2*PI*self->phase*self->frequency);
-                self->phase += self->inc;
-            }
-            lf_set_present(samples);
-        }
+
+    reaction(osc.samples) -> samples {=
+        memcpy(samples->value, osc.samples->value, SAMPLE_NUM_BYTES);
+        lf_set_present(samples);
     =}
 }

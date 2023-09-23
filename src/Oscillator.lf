@@ -1,0 +1,45 @@
+target C;
+
+
+preamble {=
+    #include "midi.h"
+    #include "freq.h"
+    #include "common.h"
+    #include <math.h>
+    #include <string.h>
+    #define AMPLITUDE 1
+    #define PI 3.14159
+=}
+
+
+reactor Oscillator {
+    input freq:double
+    input trig: bool
+    output samples: SAMPLE_TYPE[128]
+
+    state phase: double = 0
+    state freq: double = 0
+    state inc:double = 0.000022676;
+    
+    timer t(0, 2900 usec)
+}
+
+
+reactor SineWaveOscillator extends Oscillator {
+
+    reaction(t, freq) -> samples {=
+        if (freq->is_present) {
+            self->phase = 0;
+            self->freq = freq->value;
+        }
+
+        // FIXME: Skip if freq is 0
+
+        for (int i = 0; i<SAMPLE_SIZE; i++) {
+            samples->value[i] = sin(2*PI*self->phase*self->freq);
+            self->phase += self->inc;
+        }
+
+        lf_set_present(samples);
+    =}
+}
