@@ -1,6 +1,7 @@
 target C;
 
 import SineWaveOscillator from "Oscillator.lf"
+import ADSREnvelope from "Envelope.lf"
 
 preamble {=
     #include "midi.h"
@@ -15,23 +16,28 @@ reactor Synth {
     state playing:bool = false
 
     osc = new SineWaveOscillator()
-    reaction(midi_event) -> osc.freq {=
-            midi_base_msg_t * midi_msg = (midi_base_msg_t *) midi_event->value;
+    env = new ADSREnvelope()
 
+    osc.samples -> env.samples_raw
+
+    reaction(midi_event) -> osc.freq, env.note_on, env.note_off {=
+            // lf_print("MIDI event");
+            midi_base_msg_t * midi_msg = (midi_base_msg_t *) midi_event->value;
             switch (midi_msg->status.type) {
                 case NOTE_OFF:
-                    lf_set(osc.freq, 0);
+                    lf_set(env.note_off, true);
                     break;
                 case NOTE_ON: {
+                    lf_set(env.note_on, true);
                     midi_note_on_t * note_on = (midi_note_on_t *) midi_msg;
                     lf_set(osc.freq, freqs[note_on->pitch]);
                     break;
                 }
             }
     =}
-
-    reaction(osc.samples) -> samples {=
-        memcpy(samples->value, osc.samples->value, SAMPLE_NUM_BYTES);
+    
+    reaction(env.samples) -> samples {=
+        memcpy(samples->value, env.samples->value, SAMPLE_NUM_BYTES);
         lf_set_present(samples);
     =}
 }

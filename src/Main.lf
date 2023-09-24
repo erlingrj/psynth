@@ -1,6 +1,8 @@
 target C {
     files: ["freq.c","midi.h","common.h", "freq.h"],
-    cmake-include: "include.cmake"
+    cmake-include: "include.cmake",
+    fast: true
+    // tracing: true,
 }
 
 import Sequence, RandomSequence from "Sequence.lf"

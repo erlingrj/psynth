@@ -32,27 +32,30 @@ reactor Sequence(sequence: int[] = {48, 50, 52, 53, 49}, n_sequence: int = 5) {
 }
 
 
-reactor RandomSequence(period:time = 1 sec, length:int = 10) {
+reactor RandomSequence(period:time = 2 sec, length:int = 10) {
     output midi_event:int[3]
     timer t(0, period)
+    timer tOff(1 sec, period)
     logical action off
     state note_playing:int
 
     preamble {=
     =}
-
-    reaction(t) -> midi_event, off {=
-        self->note_playing = 60 + rand() % 12;
-
-        midi_note_on_t temp = MIDI_NOTE_ON(self->note_playing);
-        memcpy(midi_event->value, &temp, sizeof(temp));
-        lf_set_present(midi_event);
-        // lf_schedule(off, self->period/2);
+    reaction(startup) {=
+        srand(lf_time_physical());
     =}
 
-    reaction(off) -> midi_event {=
+    reaction(tOff) -> midi_event {=
         midi_note_off_t temp = MIDI_NOTE_OFF(self->note_playing);
         memcpy(midi_event->value, &temp, sizeof(temp));
         lf_set_present(midi_event);
     =}
+    
+    reaction(t) -> midi_event, off {=
+        self->note_playing = 60 + rand() % 12;
+        midi_note_on_t temp = MIDI_NOTE_ON(self->note_playing);
+        memcpy(midi_event->value, &temp, sizeof(temp));
+        lf_set_present(midi_event);
+    =}
+
 }

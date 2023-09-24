@@ -4,18 +4,143 @@ preamble {=
     #include "common.h"
 =}
 
-
-// Actually, we need to think a litle harder here.
-// The amplitude envelope is not "stateless" because we have these tiny
-// 128 sample buffers. We need an additional "phase" argument. This is also
-// used inside the oscillator itself. It might suggest that the envelope is
-// intrinsically connected to the oscillator. But I would like to have it
-// as a separate module. 
-
-// Then we need maybe some additional info flowing here. Which is the current phase or t.
-// Maybe we should add a little tag to each sample package?
 reactor AmplitudeEnvelope {
-    input samples_raw:SAMPLE_TYPE[128] 
-    output samples: SAMPLE_TYPE[128]    
+    input note_on: bool
+    input note_off: bool
+    input samples_raw:SAMPLE_TYPE[128]
+    output samples: SAMPLE_TYPE[128]
+}
 
+// An amplitude envelope with 4 parameters. Uses modal reactors to
+// jump between the 4 states.
+reactor ADSREnvelope(
+  attack: time = 50 msec, 
+  decay: time = 50 msec, 
+  sustain:float = 0.8,
+  release:time = 70 msec) extends AmplitudeEnvelope 
+{
+  state attack_rate: double
+  state decay_rate: double
+  state release_rate: double
+
+  state attack_start: time
+  state decay_start: time
+  state release_start: time
+  state sustain_start: time
+
+  state amp: double = 0
+  
+  reaction(startup) {=
+    self->attack_rate = 1.0/self->attack;  
+    self->decay_rate= (1.0 - self->sustain)/self->decay;  
+    self->release_rate = self->sustain/self->release;  
+  =}
+
+  initial mode Idle {
+    reaction(note_on) -> Attack {=
+      // lf_print("Attack");
+      self->attack_start = lf_time_logical_elapsed();
+      self->decay_start = self->attack_start + self->attack;
+      self->sustain_start = self->decay_start + self->decay;
+      self->amp = 0;
+      lf_set_mode(Attack);
+    =}
+
+    reaction(samples_raw) -> samples {=
+      for (int i = 0; i<SAMPLE_SIZE; i++) {
+        samples->value[i] = 0;
+      }
+      lf_set_present(samples);
+    =}
+  }
+
+  mode Attack {
+    reaction(samples_raw) -> samples, Decay {=
+      instant_t now = lf_time_logical_elapsed();
+      instant_t ts = now - self->attack_start;
+      self->amp = self->attack_rate * ts;
+
+      for (int i = 0; i<SAMPLE_SIZE; i++) {
+        samples->value[i] = samples_raw->value[i] * self->amp;
+      }
+      lf_set_present(samples);
+
+      if (now >= self->decay_start) {
+        // lf_print("Decay");
+        lf_set_mode(Decay);
+      }
+    =}
+
+    reaction(note_off) -> Release {=
+      self->release_start = lf_time_logical_elapsed();
+      lf_set_mode(Release);
+    =}
+  }
+
+  mode Decay {
+    reaction(samples_raw) -> samples, Sustain {=
+      instant_t now = lf_time_logical_elapsed();
+      instant_t ts  = now - self->decay_start;
+      self->amp = 1 - self->decay_rate * ts;
+
+      for (int i = 0; i<SAMPLE_SIZE; i++) {
+        samples->value[i] = samples_raw->value[i] * self->amp;
+      }
+      lf_set_present(samples);
+
+      if (now >= self->sustain_start) {
+        self->amp = self->sustain;
+        lf_set_mode(Sustain);
+        // lf_print("Sustain");
+      }
+    =}
+
+    reaction(note_off) -> Release {=
+      lf_set_mode(Release);
+      self->release_start = lf_time_logical_elapsed();
+        // lf_print("Release");
+    =}
+  }
+
+  mode Sustain {
+    reaction(samples_raw) -> samples {=
+      for (int i = 0; i<SAMPLE_SIZE; i++) {
+        samples->value[i] = samples_raw->value[i] * self->amp;
+      }
+      lf_set_present(samples);
+    =}
+
+    reaction(note_off) -> Release {=
+      lf_set_mode(Release);
+      self->release_start = lf_time_logical_elapsed();
+        // lf_print("Release");
+    =}
+  }
+
+  mode Release {
+    reaction(samples_raw) -> samples, Idle {=
+      instant_t now = lf_time_logical_elapsed();
+      instant_t ts = now - self->release_start;
+      self->amp = self->sustain - ts * self->release_rate;
+
+      if (self->amp <= 0) {
+        lf_set_mode(Idle);
+        // lf_print("Idle");
+      } else {
+        for (int i = 0; i<SAMPLE_SIZE; i++) {
+          samples->value[i] = samples_raw->value[i] * self->amp;
+        }
+        lf_set_present(samples);
+      }
+    =}
+
+    reaction(note_on) -> Attack {=
+      // lf_print("Attack");
+      self->attack_start = lf_time_logical_elapsed();
+      self->decay_start = self->attack_start + self->attack;
+      self->sustain_start = self->decay_start + self->decay;
+      self->amp = 0;
+      lf_set_mode(Attack);
+    =}
+  }
 }

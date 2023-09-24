@@ -8,7 +8,6 @@ preamble {=
     #include <stdint.h>
     #include "common.h"
     
-    // FIXME: Shouldnt be necessary
     #ifndef SOUND_OUTPUT_H
     #define SOUND_OUTPUT_H
     typedef struct {
@@ -39,9 +38,6 @@ reactor SoundOutput {
 
         // Initialize pa
 	    self->s = pa_simple_new(NULL, "lf_synth2", PA_STREAM_PLAYBACK, NULL, "lf_synth2", &self->spec, NULL, NULL, NULL);
-	    // if (!self->s) lf_print_error_and_exit("Could not create pa_simple");
-
-        // lf_thread_create(&self->thread_id, output_sound, &self->_args);
     =}
     reaction(samples) {= 
         pa_simple_write(self->s, samples->value, SAMPLE_NUM_BYTES, NULL);
