@@ -20,11 +20,11 @@ bin/Main
 
 ## Todo
 - [x] Add an amplitude envelope to avoid the ugly ticking audio
-- [ ] Add multiple lanes so that we can do polysynths
-- [ ] Stereo audio. (Currently we are just doing MONO)
+- [x] Add multiple waveform generators (currently we only have a sinusoidal oscillator)
+- [ ] Add FFT/inverse FFT reactor to enable simple filtering
 - [ ] Interface an actual MIDI device
-- [ ] Add multiple waveform generators (currently we only have a sinusoidal oscillator)
-
+- [ ] Add multiple lanes so that we can do polysynths
+- [ ] Stereo audio. (Currently, we are just doing MONO)
 
 
 ## References:
