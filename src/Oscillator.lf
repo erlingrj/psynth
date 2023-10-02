@@ -19,7 +19,7 @@ reactor AdditiveOscillator {
 
   reaction(sine.samples, tri.samples) -> samples {=
     for (int i = 0; i<SAMPLE_SIZE; i++) {
-      samples->value[i] = sine.samples->value[i]*0.5 + tri.samples->value[i]*5;
+      samples->value[i] = sine.samples->value[i]*0.5 + tri.samples->value[i]*0.5;
     }
     lf_set_present(samples);
   =}
