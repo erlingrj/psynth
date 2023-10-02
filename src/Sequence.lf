@@ -35,7 +35,7 @@ reactor Sequence(sequence: int[] = {48, 50, 52, 53, 49}, n_sequence: int = 5) {
 reactor RandomSequence(period:time = 2 sec, length:int = 10) {
     output midi_event:int[3]
     timer t(0, period)
-    timer tOff(1 sec, period)
+    timer tOff(900 msec, period)
     logical action off
     state note_playing:int
 

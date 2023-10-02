@@ -9,6 +9,21 @@ preamble {=
     #include <string.h>
 =}
 
+reactor AdditiveOscillator {
+  input freq:double
+  output samples: SAMPLE_TYPE[128]
+  sine = new SineOscillator()
+  tri = new TriangleOscillator()
+
+  (freq)+ -> sine.freq, tri.freq
+
+  reaction(sine.samples, tri.samples) -> samples {=
+    for (int i = 0; i<SAMPLE_SIZE; i++) {
+      samples->value[i] = sine.samples->value[i]*0.5 + tri.samples->value[i]*5;
+    }
+    lf_set_present(samples);
+  =}
+}
 
 reactor Oscillator {
     input freq:double
@@ -16,24 +31,87 @@ reactor Oscillator {
 
     state phase: double = 0
     state freq: double = 0
+    state period: double = 0
     timer t(0, 2902 usec)
+
+    reaction(freq) {=
+        self->phase = 0;
+        self->freq = freq->value;
+        self->period = 1/freq->value;
+    =}
 }
 
-
-reactor SineWaveOscillator extends Oscillator {
-
-    reaction(t, freq) -> samples {=
-        if (freq->is_present) {
+reactor SineOscillator extends Oscillator {
+    reaction(t) -> samples {=
+      if (self->freq > 0) {
+        for (int i = 0; i<SAMPLE_SIZE; i++) {
+          samples->value[i] = sin(2*PI*self->phase*self->freq);
+          self->phase += SAMPLE_STEP;
+          if (self->phase >= self->period) {
             self->phase = 0;
-            self->freq = freq->value;
+          }
         }
+      lf_set_present(samples);
+    } 
+  =}
+}
 
-        if (self->freq > 0) {
-            for (int i = 0; i<SAMPLE_SIZE; i++) {
-                samples->value[i] = sin(2*PI*self->phase*self->freq);
-                self->phase += SAMPLE_STEP;
-            }
-            lf_set_present(samples);
-        } 
-    =}
+reactor SawToothOscillator extends Oscillator {
+  reaction(t) -> samples {=
+    if (self->freq > 0) {
+      for (int i = 0; i<SAMPLE_SIZE; i++) {
+        samples->value[i] = -1.0 + 2*self->phase*self->freq; 
+        self->phase += SAMPLE_STEP;
+        if (self->phase >= self->period) {
+            self->phase = 0;
+        }
+      }
+    lf_set_present(samples);
+    } 
+  =}
+}
+
+reactor TriangleOscillator extends Oscillator {
+  state rising:bool = true
+  reaction(t) -> samples {=
+    if (self->freq > 0) {
+      for (int i = 0; i<SAMPLE_SIZE; i++) {
+        if (self->rising) {
+          samples->value[i] = -1.0 + 4*self->phase*self->freq; 
+          self->phase += SAMPLE_STEP;
+          if (self->phase >= self->period/2) {
+            self->phase = 0;
+            self->rising = false;
+          }
+        } else {
+          samples->value[i] = 1.0 - 4*self->phase*self->freq; 
+          self->phase += SAMPLE_STEP;
+          if (self->phase >= self->period/2) {
+            self->phase = 0;
+            self->rising = false;
+          }
+        }
+      }
+    lf_set_present(samples);
+    } 
+  =}
+}
+
+reactor SquareOscillator extends Oscillator {
+  reaction(t) -> samples {=
+    if (self->freq > 0) {
+      for (int i = 0; i<SAMPLE_SIZE; i++) {
+        if (self->phase < self->period/2) {
+          samples->value[i] = 0;
+        } else {
+          samples->value[i] = 1;
+        }
+        self->phase += SAMPLE_STEP;
+        if (self->phase >= self->period) {
+            self->phase = 0;
+        }
+      }
+    lf_set_present(samples);
+    } 
+  =}
 }

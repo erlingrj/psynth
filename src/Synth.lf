@@ -1,6 +1,6 @@
 target C;
 
-import SineWaveOscillator from "Oscillator.lf"
+import SquareOscillator, SineOscillator, SawToothOscillator, TriangleOscillator, AdditiveOscillator from "Oscillator.lf"
 import ADSREnvelope from "Envelope.lf"
 
 preamble {=
@@ -15,7 +15,7 @@ reactor Synth {
     output samples : SAMPLE_TYPE[128]
     state playing:bool = false
 
-    osc = new SineWaveOscillator()
+    osc = new SquareOscillator()
     env = new ADSREnvelope()
 
     osc.samples -> env.samples_raw
