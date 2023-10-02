@@ -9,7 +9,7 @@ goal of this project is to build a physical instrument.
 
 ## Getting started
 1. Install the Lingua Franca compiler: 
-`curl -Ls https://install.lf-lang.org | sh -s cli`
+`curl -Ls https://install.lf-lang.org | bash -s cli`
 2. Install the pulsaudio libraries: 
 `sudo apt install libpulse-dev`
 3. Compile and run
