@@ -19,11 +19,11 @@ bin/Main
 ```
 
 ## Todo
-- [ ] Add an amplitude envelope to avoid the ugly ticking audio
+- [x] Add an amplitude envelope to avoid the ugly ticking audio
 - [ ] Add multiple lanes so that we can do polysynths
 - [ ] Stereo audio. (Currently we are just doing MONO)
 - [ ] Interface an actual MIDI device
-- [ ] Add multiple waveforms (currently we only have a sinusoidal oscillator)
+- [ ] Add multiple waveform generators (currently we only have a sinusoidal oscillator)
 
 
 
