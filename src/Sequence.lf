@@ -68,6 +68,8 @@ reactor KeyboardSequence extends Sequence {
 
     keyboard = new KeyboardInput()
 
+    state key_pressed:bool*;
+
     reaction(startup) {=
         self->key_pressed = (bool *) malloc(127*sizeof(bool));
     =}

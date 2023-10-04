@@ -10,34 +10,75 @@ preamble {=
     #include <string.h>
 =}
 
-reactor Synth {
+reactor Synth(n_lanes:int = 4) {
     input midi_event:int[3]
     output samples : SAMPLE_TYPE[128]
-    state playing:bool = false
+    state lane_playing:int*;
 
-    osc = new SquareOscillator()
-    env = new ADSREnvelope()
+    lanes = new[n_lanes] Lane()
 
-    osc.samples -> env.samples_raw
 
-    reaction(midi_event) -> osc.freq, env.note_on, env.note_off {=
-            // lf_print("MIDI event");
+    reaction(startup) {=
+        self->lane_playing = (int *) malloc(self->n_lanes * sizeof(int));
+        for (int i = 0; i<self->n_lanes; i++) {
+            self->lane_playing[i] = -1;
+        }
+    =}
+
+    reaction(midi_event) -> lanes.note_on , lanes.note_off, lanes.freq {=
             midi_base_msg_t * midi_msg = (midi_base_msg_t *) midi_event->value;
             switch (midi_msg->status.type) {
-                case NOTE_OFF:
-                    lf_set(env.note_off, true);
+                case NOTE_OFF: {
+                    midi_note_off_t * note_off = (midi_note_off_t *) midi_msg;
+                    for (int i = 0; i<self->n_lanes; i++) {
+                        if (self->lane_playing[i] == note_off->pitch) {
+                            lf_set(lanes[i].note_off, true);
+                            self->lane_playing[i] = -1;
+                            break;
+                        }
+                    }
                     break;
+                }
                 case NOTE_ON: {
-                    lf_set(env.note_on, true);
                     midi_note_on_t * note_on = (midi_note_on_t *) midi_msg;
-                    lf_set(osc.freq, freqs[note_on->pitch]);
+                    for (int i = 0; i<self->n_lanes; i++) {
+                        if (self->lane_playing[i] == -1) {
+                            lf_set(lanes[i].note_on, true);
+                            lf_set(lanes[i].freq, freqs[note_on->pitch]);
+                            self->lane_playing[i] = note_on->pitch;
+                            break;
+                        }
+                    }
                     break;
                 }
             }
     =}
     
-    reaction(env.samples) -> samples {=
-        memcpy(samples->value, env.samples->value, SAMPLE_NUM_BYTES);
+    reaction(lanes.samples) -> samples {=
+        for (int i=0; i<SAMPLE_SIZE; i++) {
+            float v = 0;
+            for (int j=0; j<lanes_width; j++) {
+                v += lanes[j].samples->value[i];
+            }
+            samples->value[i] = v;
+        }
         lf_set_present(samples);
     =}
+}
+
+reactor Lane(bank_index: int = 0) {
+    input note_on:bool
+    input note_off:bool
+    input freq:double
+    output samples: SAMPLE_TYPE[128]
+    
+    osc = new SineOscillator()
+    env = new ADSREnvelope()
+
+    note_on -> env.note_on
+    note_off -> env.note_off
+    freq -> osc.freq
+
+    osc.samples -> env.samples_raw
+    env.samples -> samples
 }

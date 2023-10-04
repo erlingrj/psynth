@@ -15,7 +15,8 @@ reactor AdditiveOscillator {
   sine = new SineOscillator()
   tri = new TriangleOscillator()
 
-  (freq)+ -> sine.freq, tri.freq
+  freq-> sine.freq
+  freq-> tri.freq
 
   reaction(sine.samples, tri.samples) -> samples {=
     for (int i = 0; i<SAMPLE_SIZE; i++) {
