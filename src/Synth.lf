@@ -72,7 +72,7 @@ reactor Lane(bank_index: int = 0) {
     input freq:double
     output samples: SAMPLE_TYPE[128]
     
-    osc = new SineOscillator()
+    osc = new TriangleOscillator()
     env = new ADSREnvelope()
 
     note_on -> env.note_on
