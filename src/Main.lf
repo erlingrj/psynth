@@ -1,17 +1,17 @@
 target C {
     files: ["freq.c","midi.h","common.h", "freq.h"],
     cmake-include: "include.cmake",
-    fast: true
+    // fast: true,
     // tracing: true,
 }
 
-import Sequence, RandomSequence from "Sequence.lf"
+import RepeatedSequence, RandomSequence, KeyboardSequence from "Sequence.lf"
 import SoundOutput from "SoundOutput.lf"
 import Synth from "Synth.lf"
 
 
 main reactor {
-    seq = new RandomSequence()
+    seq = new KeyboardSequence()
     synth = new Synth()
     out = new SoundOutput()
 
