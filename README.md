@@ -21,8 +21,9 @@ bin/Main
 ## Todo
 - [x] Add an amplitude envelope to avoid the ugly ticking audio
 - [x] Add multiple waveform generators (currently we only have a sinusoidal oscillator)
-- [ ] Add FFT/inverse FFT reactor to enable simple filtering
 - [x] Add multiple lanes so that we can do polysynths
+- [ ] Add a browser-based UI for displaying the resulting waveform++
+- [ ] Add FFT/inverse FFT reactor to enable simple filtering
 - [ ] There is something wrong with the sine oscillator. With poly0-synth it is all wierd. It is also veyr low in volume compared to tringale
 - [ ] Interface an actual MIDI device
 - [ ] Stereo audio. (Currently, we are just doing MONO)
