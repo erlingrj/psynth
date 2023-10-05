@@ -8,13 +8,17 @@ target C {
 import RepeatedSequence, RandomSequence, KeyboardSequence from "Sequence.lf"
 import SoundOutput from "SoundOutput.lf"
 import Synth from "Synth.lf"
-
+import WebSocketServer from "lib/WebSocketServer.lf"
 
 main reactor {
     seq = new KeyboardSequence()
     synth = new Synth()
     out = new SoundOutput()
+    webSocket = new WebSocketServer()
+
+    
 
     seq.midi_event -> synth.midi_event
     synth.samples -> out.samples
+
 }

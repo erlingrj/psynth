@@ -1,6 +1,6 @@
 target C;
 
-import KeyboardInput from "Keyboard.lf"
+import KeyboardInput from "lib/Keyboard.lf"
 
 preamble {=
     #include "midi.h"
