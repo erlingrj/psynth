@@ -1,0 +1,64 @@
+target C;
+
+import KeyboardSequence from "Sequence.lf"
+import WebSocketServer from "lib/WebSocketServer.lf"
+preamble {= 
+    #include <stdio.h>
+    #include "common.h"
+=}
+
+reactor WaveformDisplay {
+    input samples: SAMPLE_TYPE[128]
+
+    sock = new WebSocketServer(max_clients=1)
+
+    state wsi: void* = 0 
+
+    state buffer: SAMPLE_TYPE*
+    state idx: int = 0;
+
+    reaction(startup) {=
+        self->buffer = (SAMPLE_TYPE *) malloc(SAMPLE_NUM_BYTES);
+    =}
+
+    reaction(samples) -> sock.send {=
+        if (self->wsi) {
+            for (int i = 0; i<SAMPLE_SIZE; i=i+16) {
+                self->buffer[self->idx++] = samples->value[i];
+            }
+            if (self->idx == SAMPLE_SIZE) {
+                char* message; web_socket_message_t* container = (web_socket_message_t*)malloc(sizeof(web_socket_message_t));
+                container->message = (char *) self->buffer;
+                container->length = SAMPLE_NUM_BYTES;
+                container->wsi = self->wsi;
+                lf_set(sock.send, container);
+                self->idx = 0;
+            }
+        }
+    =}
+
+    reaction(sock.connected) {=
+        if(sock.connected->value.connected) {
+            lf_print("New clienta connected to our web socket");
+            self->wsi = sock.connected->value.wsi;
+        } else {
+            lf_print("Client disconnected from our web socket");
+            self->wsi = 0;
+        }
+    =}
+
+}
+
+
+reactor UserInterface {
+    input samples: SAMPLE_TYPE[128]
+    output midi_event:int[3]
+
+    
+    seq = new KeyboardSequence()
+    disp = new WaveformDisplay()
+
+    seq.midi_event -> midi_event
+    samples -> disp.samples
+
+}
