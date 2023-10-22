@@ -1,6 +1,6 @@
 target C;
 
-import SquareOscillator, SineOscillator, SawToothOscillator, TriangleOscillator, AdditiveOscillator from "Oscillator.lf"
+import Oscillator from "Oscillator.lf"
 import ADSREnvelope from "Envelope.lf"
 
 preamble {=
@@ -70,14 +70,16 @@ reactor Lane(bank_index: int = 0) {
     input note_on:bool
     input note_off:bool
     input freq:double
+    input osc_type: osc_type_t
     output samples: SAMPLE_TYPE[128]
     
-    osc = new TriangleOscillator()
+    osc = new Oscillator(initialType = {=OSC_SAW=})
     env = new ADSREnvelope()
 
     note_on -> env.note_on
     note_off -> env.note_off
     freq -> osc.freq
+    osc_type -> osc.type
 
     osc.samples -> env.samples_raw
     env.samples -> samples

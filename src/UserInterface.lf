@@ -1,17 +1,22 @@
 target C;
 
-import KeyboardSequence from "Sequence.lf"
 import WebSocketServer from "lib/WebSocketServer.lf"
+import KeyboardInput from "lib/Keyboard.lf"
+
 preamble {= 
     #include <stdio.h>
     #include "common.h"
+    #include "midi.h"
 =}
 
-reactor WaveformDisplay {
+reactor UserInterface {
     input samples: SAMPLE_TYPE[128]
+    output midi_event:int[3]
+}
 
+
+reactor WebSocketUserInterface extends UserInterface {
     sock = new WebSocketServer(max_clients=1)
-
     state wsi: void* = 0 
 
     state buffer: SAMPLE_TYPE*
@@ -19,6 +24,10 @@ reactor WaveformDisplay {
 
     reaction(startup) {=
         self->buffer = (SAMPLE_TYPE *) malloc(SAMPLE_NUM_BYTES);
+    =}
+    
+    reaction(sock.received) -> midi_event {=
+        lf_print("Got MIDI from browser %s", sock.received->value->message);
     =}
 
     reaction(samples) -> sock.send {=
@@ -37,28 +46,89 @@ reactor WaveformDisplay {
         }
     =}
 
+
+
+
+
     reaction(sock.connected) {=
         if(sock.connected->value.connected) {
-            lf_print("New clienta connected to our web socket");
+            lf_print("New client connected to our web socket");
             self->wsi = sock.connected->value.wsi;
         } else {
             lf_print("Client disconnected from our web socket");
             self->wsi = 0;
         }
     =}
-
 }
 
 
-reactor UserInterface {
-    input samples: SAMPLE_TYPE[128]
-    output midi_event:int[3]
+reactor CursesUserInterface extends UserInterface {
+    keyboard = new KeyboardInput()
+    state key_pressed:bool*;
+    reaction(startup) {=
+        self->key_pressed = (bool *) malloc(127*sizeof(bool));
+    =}
 
-    
-    seq = new KeyboardSequence()
-    disp = new WaveformDisplay()
+    reaction(keyboard.key) -> midi_event {=
+        int note;
 
-    seq.midi_event -> midi_event
-    samples -> disp.samples
+        switch(keyboard.key->value) {
+            case 'a':
+                note=NOTE_C3;
+                break;
+            case 'w':
+                note=NOTE_CS3;
+                break;
+            case 's':
+                note=NOTE_D3;
+                break;
+            case 'e':
+                note=NOTE_DS3;
+                break;
+            case 'd':
+                note=NOTE_E3;
+                break;
+            case 'f':
+                note=NOTE_F3;
+                break;
+            case 't':
+                note=NOTE_FS3;
+                break;
+            case 'g':
+                note=NOTE_G3;
+                break;
+            case 'y':
+                note=NOTE_GS3;
+                break;
+            case 'h':
+                note=NOTE_A3;
+                break;
+            case 'u':
+                note=NOTE_AS3;
+                break;
+            case 'j':
+                note=NOTE_B3;
+                break;
+            case 'k':
+                note=NOTE_C4;
+                break;
+            default:
+                lf_print("Illegal character");
+                return;
+                break;
+        }
+        lf_print("Got %d", note);
 
+        if (self->key_pressed[note]) {
+            midi_note_on_t temp = MIDI_NOTE_OFF(note);
+            memcpy(midi_event->value, &temp, sizeof(temp));
+            self->key_pressed[note] = false;
+        } else {
+            midi_note_on_t temp = MIDI_NOTE_ON(note);
+            memcpy(midi_event->value, &temp, sizeof(temp));
+            self->key_pressed[note] = true;
+        }
+        lf_print("Got %d", note);
+        lf_set_present(midi_event);
+    =}
 }

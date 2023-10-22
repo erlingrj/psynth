@@ -31,6 +31,12 @@ typedef struct {
 } midi_note_off_t;
 
 
+typedef enum {
+    OSC_SINE,
+    OSC_SQUARE,
+    OSC_SAW,
+    OSC_TRI,
+} osc_type_t;
 #define MIDI_NOTE_ON(x) {.status.channel=0, .status.type=NOTE_ON, .pitch=x, .velocity=60}
 #define MIDI_NOTE_OFF(x) {.status.channel=0, .status.type=NOTE_OFF, .pitch=x, .velocity=60}
 
