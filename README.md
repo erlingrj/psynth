@@ -12,7 +12,12 @@ goal of this project is to build a physical instrument.
 `curl -Ls https://install.lf-lang.org | bash -s cli`
 2. Install the pulsaudio libraries: 
 `sudo apt install libpulse-dev`
-3. Compile and run
+3. Compile libkissfft:
+```
+cd src/lib/kissfft
+make KISSFFT_STATIC=1 KISSFFT_DATATYPE=double all
+```
+4. Compile and run
 ```
 lfc src/Main.lf
 bin/Main
@@ -22,9 +27,13 @@ bin/Main
 - [x] Add an amplitude envelope to avoid the ugly ticking audio
 - [x] Add multiple waveform generators (currently we only have a sinusoidal oscillator)
 - [x] Add multiple lanes so that we can do polysynths
-- [ ] Add a browser-based UI for displaying the resulting waveform++
-- [ ] Add FFT/inverse FFT reactor to enable simple filtering
-- [ ] There is something wrong with the sine oscillator. With poly0-synth it is all wierd. It is also veyr low in volume compared to tringale
+- [x] Add a browser-based UI
+- [x] Add FFT/inverse FFT reactor to enable simple filtering
+- [x] There is something wrong with the sine oscillator. With poly0-synth it is all wierd. It is also veyr low in volume compared to tringale
+- [x] Support program change MIDI commands
+- [ ] Support control change MIDI commands for ADSR amplitude envelope
+- [ ] Add a compressor, currently scaling down each lane if multiple lanes active
+- [ ] Add a simple low-pass filter
 - [ ] Interface an actual MIDI device
 - [ ] Stereo audio. (Currently, we are just doing MONO)
 
