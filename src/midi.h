@@ -4,6 +4,7 @@
 typedef enum {
     NOTE_OFF,  // binary: 000
     NOTE_ON,  // binary: 001
+    PROGRAM_CHANGE
 } midi_type_t;
 
 // Define the byte struct
@@ -30,15 +31,25 @@ typedef struct {
     unsigned char velocity;
 } midi_note_off_t;
 
+typedef struct {
+    midi_status_t status;
+    unsigned char program;
+} midi_program_change_t;
+
 
 typedef enum {
     OSC_SINE,
     OSC_SQUARE,
     OSC_SAW,
     OSC_TRI,
+    NUM_OSC
 } osc_type_t;
+
+
 #define MIDI_NOTE_ON(x) {.status.channel=0, .status.type=NOTE_ON, .pitch=x, .velocity=60}
 #define MIDI_NOTE_OFF(x) {.status.channel=0, .status.type=NOTE_OFF, .pitch=x, .velocity=60}
+#define MIDI_PROGRAM_CHANGE(x){.status.channel=0, .status.type=PROGRAM_CHANGE, .program=x}
+
 
 #define NOTE_CN1	0
 #define NOTE_CSN1	1

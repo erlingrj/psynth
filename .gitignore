@@ -2,3 +2,10 @@ bin
 src-gen
 .vscode
 include
+**.out
+**.csv
+**.gp
+**.pdf
+**.png
+**.lft
+**.json

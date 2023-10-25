@@ -8,8 +8,8 @@ preamble {=
     #include "common.h"
 =}
 
-reactor SoundOutput {
-    input samples: SAMPLE_TYPE[128]
+reactor SoundOutput(sample_size:int=128) {
+    input samples: sample_buf_t
     state spec: pa_sample_spec;
     state s: pa_simple*
 

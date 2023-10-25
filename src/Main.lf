@@ -1,5 +1,5 @@
 target C {
-    files: ["freq.c","midi.h","common.h", "freq.h"],
+    files: ["freq.c","midi.h","common.h", "freq.h", "lib/kissfft/kiss_fft.h", "lib/kissfft/libkissfft-double.a"],
     cmake-include: "include.cmake",
     build-type: Debug,
     // fast: true,
@@ -8,16 +8,27 @@ target C {
 
 import SoundOutput from "SoundOutput.lf"
 import Synth from "Synth.lf"
-import WebSocketUserInterface as UserInterface from "UserInterface.lf"
+import CursesUserInterface as UserInterface from "UserInterface.lf"
+import FFT, IFFT from "FFT.lf"
+import Print from "Print.lf"
 
 main reactor {
-    synth = new Synth()
-    out = new SoundOutput()
-    ui = new UserInterface()
+  synth = new Synth()
+  out = new SoundOutput()
+  ui = new UserInterface()
+  fft = new FFT()
+  ifft = new IFFT()
 
+  ui.midi_event -> synth.midi_event
+  synth.samples -> fft.tsamples
+  fft.fsamples -> ifft.fsamples
+  ifft.tsamples -> out.samples
 
-    ui.midi_event -> synth.midi_event
-    synth.samples -> out.samples
-    synth.samples -> ui.samples
-
+  // Printing and creating waveforms. Just for debug
+  tprint1 = new Print(filename="t1.csv", pg_name="t1.gp")
+  tprint2 = new Print(filename="t2.csv", pg_name="t2.gp")
+  fprint = new Print(filename="f1.csv", pg_name="f1.gp")
+  synth.samples -> tprint1.tsamples
+  ifft.tsamples -> tprint2.tsamples
+  fft.fsamples -> fprint.fsamples
 }

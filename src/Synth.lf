@@ -1,86 +1,102 @@
-target C;
+target C
 
 import Oscillator from "Oscillator.lf"
 import ADSREnvelope from "Envelope.lf"
 
 preamble {=
-    #include "midi.h"
-    #include "freq.h"
-    #include "common.h"
-    #include <string.h>
+  #include "midi.h"
+  #include "freq.h"
+  #include "common.h"
+  #include <string.h>
 =}
 
-reactor Synth(n_lanes:int = 4) {
-    input midi_event:int[3]
-    output samples : SAMPLE_TYPE[128]
-    state lane_playing:int*;
+reactor Synth(n_lanes: int = 4, sample_size:int=128) {
+  input midi_event: int[3]
+  output samples: sample_buf_t
+  state lane_playing: int*
 
-    lanes = new[n_lanes] Lane()
+  lanes = new[n_lanes] Lane()
 
+  reaction(startup) {=
+    self->lane_playing = (int *) malloc(self->n_lanes * sizeof(int));
+    for (int i = 0; i<self->n_lanes; i++) {
+        self->lane_playing[i] = -1;
+    }
+  =}
 
-    reaction(startup) {=
-        self->lane_playing = (int *) malloc(self->n_lanes * sizeof(int));
+  reaction(midi_event) -> lanes.note_on, lanes.note_off, lanes.freq, lanes.osc_type {=
+    midi_base_msg_t * midi_msg = (midi_base_msg_t *) midi_event->value;
+    switch (midi_msg->status.type) {
+      case NOTE_OFF: {
+        midi_note_off_t * note_off = (midi_note_off_t *) midi_msg;
         for (int i = 0; i<self->n_lanes; i++) {
+          if (self->lane_playing[i] == note_off->pitch) {
+            lf_set(lanes[i].note_off, true);
             self->lane_playing[i] = -1;
+            break;
+          }
         }
-    =}
+        break;
+      }
+      case NOTE_ON: {
+        midi_note_on_t * note_on = (midi_note_on_t *) midi_msg;
+        for (int i = 0; i<self->n_lanes; i++) {
+          if (self->lane_playing[i] == -1) {
+            lf_set(lanes[i].note_on, true);
+            lf_set(lanes[i].freq, freqs[note_on->pitch]);
+            self->lane_playing[i] = note_on->pitch;
+            break;
+          }
+        }
+        break;
+      }
 
-    reaction(midi_event) -> lanes.note_on , lanes.note_off, lanes.freq {=
-            midi_base_msg_t * midi_msg = (midi_base_msg_t *) midi_event->value;
-            switch (midi_msg->status.type) {
-                case NOTE_OFF: {
-                    midi_note_off_t * note_off = (midi_note_off_t *) midi_msg;
-                    for (int i = 0; i<self->n_lanes; i++) {
-                        if (self->lane_playing[i] == note_off->pitch) {
-                            lf_set(lanes[i].note_off, true);
-                            self->lane_playing[i] = -1;
-                            break;
-                        }
-                    }
-                    break;
-                }
-                case NOTE_ON: {
-                    midi_note_on_t * note_on = (midi_note_on_t *) midi_msg;
-                    for (int i = 0; i<self->n_lanes; i++) {
-                        if (self->lane_playing[i] == -1) {
-                            lf_set(lanes[i].note_on, true);
-                            lf_set(lanes[i].freq, freqs[note_on->pitch]);
-                            self->lane_playing[i] = note_on->pitch;
-                            break;
-                        }
-                    }
-                    break;
-                }
-            }
-    =}
-    
-    reaction(lanes.samples) -> samples {=
-        for (int i=0; i<SAMPLE_SIZE; i++) {
-            float v = 0;
-            for (int j=0; j<lanes_width; j++) {
-                v += lanes[j].samples->value[i];
-            }
-            samples->value[i] = v;
+      case PROGRAM_CHANGE: {
+        lf_print("Oscillator change");
+        midi_program_change_t * program = (midi_program_change_t*) midi_msg;
+        for (int i = 0; i<self->n_lanes; i++) {
+          lf_set(lanes[i].osc_type, program->program);
         }
-        lf_set_present(samples);
-    =}
+        break;
+      }
+    }
+  =}
+
+  reaction(lanes.samples) -> samples {=
+    int n_present = 0;
+    for (int i=0; i<lanes_width; i++) {
+      if (lanes[i].samples->is_present) {
+        n_present++;
+      }
+    }
+    for (int i=0; i<SAMPLE_SIZE; i++) {
+      float v = 0;
+      for (int j=0; j<lanes_width; j++) {
+        if (lanes[j].samples->is_present) {
+          v += lanes[j].samples->value[i];
+        }
+      }
+      samples->value[i] = v;
+    }
+    lf_set_present(samples);
+  =}
 }
 
-reactor Lane(bank_index: int = 0) {
-    input note_on:bool
-    input note_off:bool
-    input freq:double
-    input osc_type: osc_type_t
-    output samples: SAMPLE_TYPE[128]
-    
-    osc = new Oscillator(initialType = {=OSC_SAW=})
-    env = new ADSREnvelope()
+reactor Lane(bank_index: int = 0, sample_size:int=128) {
+  input note_on: bool
+  input note_off: bool
+  input freq: double
+  input osc_type: osc_type_t
+  output samples: sample_buf_t
 
-    note_on -> env.note_on
-    note_off -> env.note_off
-    freq -> osc.freq
-    osc_type -> osc.type
+  osc = new Oscillator(initialType = {= OSC_SINE =})
+  env = new ADSREnvelope()
 
-    osc.samples -> env.samples_raw
-    env.samples -> samples
+  note_on -> env.note_on
+  note_off -> env.note_off
+  freq -> osc.freq
+  osc_type -> osc.type
+
+  osc.samples -> env.samples_raw
+  env.samples -> samples
 }

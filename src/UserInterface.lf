@@ -9,8 +9,8 @@ preamble {=
     #include "midi.h"
 =}
 
-reactor UserInterface {
-    input samples: SAMPLE_TYPE[128]
+reactor UserInterface(sample_size:int=128) {
+    input samples: sample_buf_t
     output midi_event:int[3]
 }
 
@@ -65,70 +65,105 @@ reactor WebSocketUserInterface extends UserInterface {
 reactor CursesUserInterface extends UserInterface {
     keyboard = new KeyboardInput()
     state key_pressed:bool*;
+    state octave:int = {=NOTE_C3=};
+    state program:int = 0;
     reaction(startup) {=
-        self->key_pressed = (bool *) malloc(127*sizeof(bool));
+        self->key_pressed = (bool *) malloc(NOTE_G9*sizeof(bool));
     =}
 
-    reaction(keyboard.key) -> midi_event {=
-        int note;
+    logical action killall;
+
+    reaction(keyboard.key) -> midi_event, killall {=
+        int note = -1;
+        int program = -1;
 
         switch(keyboard.key->value) {
             case 'a':
-                note=NOTE_C3;
+                note=self->octave+0;
                 break;
             case 'w':
-                note=NOTE_CS3;
+                note=self->octave+1;
                 break;
             case 's':
-                note=NOTE_D3;
+                note=self->octave+2;
                 break;
             case 'e':
-                note=NOTE_DS3;
+                note=self->octave+3;
                 break;
             case 'd':
-                note=NOTE_E3;
+                note=self->octave+4;
                 break;
             case 'f':
-                note=NOTE_F3;
+                note=self->octave+5;
                 break;
             case 't':
-                note=NOTE_FS3;
+                note=self->octave+6;
                 break;
             case 'g':
-                note=NOTE_G3;
+                note=self->octave+7;
                 break;
             case 'y':
-                note=NOTE_GS3;
+                note=self->octave+8;
                 break;
             case 'h':
-                note=NOTE_A3;
+                note=self->octave+9;
                 break;
             case 'u':
-                note=NOTE_AS3;
+                note=self->octave+10;
                 break;
             case 'j':
-                note=NOTE_B3;
+                note=self->octave+11;
                 break;
             case 'k':
-                note=NOTE_C4;
+                note=self->octave+12;
+                break;
+            case 'z':
+                self->octave-=12;
+                break;
+            case 'x':
+                self->octave+=12;
+                break;
+            case 'c':
+                program = (self->program+1) % NUM_OSC;
+                break;
+            case 'q':
+                lf_schedule(killall, 0);
                 break;
             default:
                 lf_print("Illegal character");
                 return;
                 break;
         }
-        lf_print("Got %d", note);
 
-        if (self->key_pressed[note]) {
-            midi_note_on_t temp = MIDI_NOTE_OFF(note);
+        if (note >= 0) {
+            if (self->key_pressed[note]) {
+                midi_note_on_t temp = MIDI_NOTE_OFF(note);
+                memcpy(midi_event->value, &temp, sizeof(temp));
+                self->key_pressed[note] = false;
+            } else {
+                midi_note_on_t temp = MIDI_NOTE_ON(note);
+                memcpy(midi_event->value, &temp, sizeof(temp));
+                self->key_pressed[note] = true;
+            }
+            lf_print("Got %d", note);
+            lf_set_present(midi_event);
+        } else if (program >= 0) {
+            midi_program_change_t temp = MIDI_PROGRAM_CHANGE(program);
             memcpy(midi_event->value, &temp, sizeof(temp));
-            self->key_pressed[note] = false;
-        } else {
-            midi_note_on_t temp = MIDI_NOTE_ON(note);
-            memcpy(midi_event->value, &temp, sizeof(temp));
-            self->key_pressed[note] = true;
+            self->program = program;
+            lf_set_present(midi_event);
+        } 
+    =}
+    reaction(killall) -> killall, midi_event {=
+        for (int i=0; i<NOTE_G9; i++) {
+            if (self->key_pressed[i]) {    
+                midi_note_on_t temp = MIDI_NOTE_OFF(i);
+                memcpy(midi_event->value, &temp, sizeof(temp));
+                self->key_pressed[i] = false;
+                lf_set_present(midi_event);
+                lf_schedule(killall, 0);
+                return;
+            }
         }
-        lf_print("Got %d", note);
-        lf_set_present(midi_event);
     =}
 }
