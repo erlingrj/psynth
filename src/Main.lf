@@ -1,5 +1,5 @@
 target C {
-    files: ["freq.c","midi.h","common.h", "freq.h", "lib/kissfft/kiss_fft.h", "lib/kissfft/libkissfft-double.a"],
+    files: ["freq.c","midi.h","common.h", "freq.h", "../external/kissfft/kiss_fft.h", "../external/kissfft/libkissfft-float.a"],
     cmake-include: "include.cmake",
     build-type: Debug,
     // fast: true,

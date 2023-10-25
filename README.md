@@ -14,8 +14,8 @@ goal of this project is to build a physical instrument.
 `sudo apt install libpulse-dev`
 3. Compile libkissfft:
 ```
-cd src/lib/kissfft
-make KISSFFT_STATIC=1 KISSFFT_DATATYPE=double all
+cd external/kissfft
+make KISSFFT_STATIC=1 all
 ```
 4. Compile and run
 ```

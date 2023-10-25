@@ -73,7 +73,7 @@ reactor Synth(n_lanes: int = 4, sample_size:int=128) {
       float v = 0;
       for (int j=0; j<lanes_width; j++) {
         if (lanes[j].samples->is_present) {
-          v += lanes[j].samples->value[i];
+          v += lanes[j].samples->value[i]/n_present;
         }
       }
       samples->value[i] = v;

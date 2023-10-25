@@ -76,10 +76,12 @@ reactor Print(filename: string = "waves.csv", pg_name: string = "plot.pg", only_
         fprintf(self->file, "Time,Amplitude\n");
       }
     }
-    for (int i = 0; i<SAMPLE_SIZE; i++) {
+    // FIXME: Here I only show 1/4 of the spectre because thats where everything is?
+    for (int i = 0; i<SAMPLE_SIZE/4; i++) {
       fprintf(self->file,
         "%i,%f\n",
         i,
+        // FIXME: Is even the magnitude the right approach here?
         sqrt(fsamples->value[i].r * fsamples->value[i].r + fsamples->value[i].i * fsamples->value[i].i)
       );
     }

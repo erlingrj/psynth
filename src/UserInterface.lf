@@ -65,7 +65,7 @@ reactor WebSocketUserInterface extends UserInterface {
 reactor CursesUserInterface extends UserInterface {
     keyboard = new KeyboardInput()
     state key_pressed:bool*;
-    state octave:int = {=NOTE_C3=};
+    state octave:int = {=NOTE_C4=};
     state program:int = 0;
     reaction(startup) {=
         self->key_pressed = (bool *) malloc(NOTE_G9*sizeof(bool));
