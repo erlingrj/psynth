@@ -64,16 +64,20 @@ reactor WebSocketUserInterface extends UserInterface {
 
 reactor CursesUserInterface extends UserInterface {
     keyboard = new KeyboardInput()
+    state key_pressed_next:bool*
     state key_pressed:bool*;
     state octave:int = {=NOTE_C4=};
     state program:int = 0;
     reaction(startup) {=
         self->key_pressed = (bool *) malloc(NOTE_G9*sizeof(bool));
+        self->key_pressed_next = (bool *) malloc(NOTE_G9*sizeof(bool));
     =}
 
     logical action killall;
+    logical action modulate: int
+    logical action note_on: int
 
-    reaction(keyboard.key) -> midi_event, killall {=
+    reaction(keyboard.key) -> midi_event, killall, modulate {=
         int note = -1;
         int program = -1;
 
@@ -129,6 +133,36 @@ reactor CursesUserInterface extends UserInterface {
             case 'q':
                 lf_schedule(killall, 0);
                 break;
+            case '1':
+            case '2':
+            case '3':
+            case '4':
+            case '5':
+            case '6':
+            case '7':
+                lf_schedule_int(modulate, 0, keyboard.key->value - '0');
+                break;
+            case '!':
+                lf_schedule_int(modulate, 0, -1);
+                break;
+            case '@':
+                lf_schedule_int(modulate, 0, -2);
+                break;
+            case '#':
+                lf_schedule_int(modulate, 0, -3);
+                break;
+            case '$':
+                lf_schedule_int(modulate, 0, -4);
+                break;
+            case '%':
+                lf_schedule_int(modulate, 0, -5);
+                break;
+            case '^':
+                lf_schedule_int(modulate, 0, -6);
+                break;
+            case '&':
+                lf_schedule_int(modulate, 0, -7);
+                break;
             default:
                 lf_print("Illegal character");
                 return;
@@ -164,6 +198,37 @@ reactor CursesUserInterface extends UserInterface {
                 lf_schedule(killall, 0);
                 return;
             }
+        }
+    =}
+    reaction(note_on) -> midi_event {=
+        lf_print("turn on %i", note_on->value);
+        midi_note_on_t temp = MIDI_NOTE_ON(note_on->value);
+        memcpy(midi_event->value, &temp, sizeof(temp));
+        lf_set_present(midi_event);
+    =}
+
+    reaction(modulate) -> note_on, midi_event, modulate {=
+        lf_print("Modulate with: %i", modulate->value);
+        for (int i=0; i<NOTE_G9; i++) {
+            if (self->key_pressed[i]) {    
+                lf_print("turn off %i", i);
+                midi_note_on_t temp = MIDI_NOTE_OFF(i);
+                memcpy(midi_event->value, &temp, sizeof(temp));
+                self->key_pressed[i] = false;
+                int modulated_tone = i + modulate->value;
+                if (modulated_tone < 0) modulated_tone=0;
+                if (modulated_tone > NOTE_G9) modulated_tone=NOTE_G9;
+
+                self->key_pressed_next[modulated_tone] = true;
+                lf_set_present(midi_event);
+                lf_schedule_int(note_on, 0, modulated_tone);
+                lf_schedule_int(modulate, 1, modulate->value);
+                return;
+            }
+        }
+        for (int i=0; i<NOTE_G9; i++) {
+            self->key_pressed[i] = self->key_pressed_next[i];
+            self->key_pressed_next[i] = 0;
         }
     =}
 }

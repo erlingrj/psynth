@@ -11,6 +11,7 @@ import Synth from "Synth.lf"
 import CursesUserInterface as UserInterface from "UserInterface.lf"
 import FFT, IFFT from "FFT.lf"
 import Print from "Print.lf"
+import OscillatorChangeSequence from "Sequence.lf"
 
 main reactor {
   synth = new Synth()
@@ -19,7 +20,9 @@ main reactor {
   fft = new FFT()
   ifft = new IFFT()
 
-  ui.midi_event -> synth.midi_event
+  oscChange = new OscillatorChangeSequence()
+
+  ui.midi_event, oscChange.midi_event -> synth.midi_event
   synth.samples -> fft.tsamples
   fft.fsamples -> ifft.fsamples
   ifft.tsamples -> out.samples

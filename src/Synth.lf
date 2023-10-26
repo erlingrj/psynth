@@ -11,7 +11,7 @@ preamble {=
 =}
 
 reactor Synth(n_lanes: int = 4, sample_size:int=128) {
-  input midi_event: int[3]
+  input[2] midi_event: int[3]
   output samples: sample_buf_t
   state lane_playing: int*
 
@@ -25,12 +25,18 @@ reactor Synth(n_lanes: int = 4, sample_size:int=128) {
   =}
 
   reaction(midi_event) -> lanes.note_on, lanes.note_off, lanes.freq, lanes.osc_type {=
-    midi_base_msg_t * midi_msg = (midi_base_msg_t *) midi_event->value;
+    midi_base_msg_t * midi_msg;
+    if (midi_event[0]->is_present) {
+      midi_msg = (midi_base_msg_t *) midi_event[0]->value;
+    } else {
+      midi_msg = (midi_base_msg_t *) midi_event[1]->value;
+    }
     switch (midi_msg->status.type) {
       case NOTE_OFF: {
         midi_note_off_t * note_off = (midi_note_off_t *) midi_msg;
         for (int i = 0; i<self->n_lanes; i++) {
           if (self->lane_playing[i] == note_off->pitch) {
+            lf_print("OFF: %i", note_off->pitch);
             lf_set(lanes[i].note_off, true);
             self->lane_playing[i] = -1;
             break;
@@ -39,9 +45,11 @@ reactor Synth(n_lanes: int = 4, sample_size:int=128) {
         break;
       }
       case NOTE_ON: {
+        lf_print("ON");
         midi_note_on_t * note_on = (midi_note_on_t *) midi_msg;
         for (int i = 0; i<self->n_lanes; i++) {
           if (self->lane_playing[i] == -1) {
+            lf_print("ON: %i", note_on->pitch);
             lf_set(lanes[i].note_on, true);
             lf_set(lanes[i].freq, freqs[note_on->pitch]);
             self->lane_playing[i] = note_on->pitch;
@@ -52,7 +60,6 @@ reactor Synth(n_lanes: int = 4, sample_size:int=128) {
       }
 
       case PROGRAM_CHANGE: {
-        lf_print("Oscillator change");
         midi_program_change_t * program = (midi_program_change_t*) midi_msg;
         for (int i = 0; i<self->n_lanes; i++) {
           lf_set(lanes[i].osc_type, program->program);
