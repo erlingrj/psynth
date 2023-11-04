@@ -2,46 +2,54 @@ target C
 
 preamble {=
   #include "common.h"
+  #include "buffer.h"
 =}
 
 reactor FFT {
-  input tsamples: sample_buf_t
-  output fsamples: fsample_buf_t
+  input tsamples: sample_buffer_t*
+  output fsamples: fsample_buffer_t*
 
   state cfg:kiss_fft_cfg
 
-  reaction(startup) {=
+  reaction(startup) -> fsamples {=
     self->cfg = kiss_fft_alloc(SAMPLE_SIZE,0, NULL,NULL);
+
+    lf_set_destructor(fsamples, fsample_buffer_destructor);
+    lf_set_copy_constructor(fsamples, fsample_buffer_copy);
   =}
 
   reaction(tsamples) -> fsamples {=
+    fsample_buffer_t* array =  fsample_buffer_ctor();
     kiss_fft_cpx fin[SAMPLE_SIZE];
     for (int i=0; i<SAMPLE_SIZE; i++) {
-      fin[i].r = tsamples->value[i];
+      fin[i].r = tsamples->value->samples[i];
       fin[i].i = 0;
     }
 
-    kiss_fft(self->cfg, fin, fsamples->value);
-    lf_set_present(fsamples);
+    kiss_fft(self->cfg, fin, array->samples);
+    lf_set(fsamples, array);
   =}
 }
 
 reactor IFFT {
-  output tsamples: sample_buf_t
-  input fsamples: fsample_buf_t
+  output tsamples: sample_buffer_t*
+  input fsamples: fsample_buffer_t*
   state cfg:kiss_fft_cfg
 
-  reaction(startup) {=
+  reaction(startup) -> tsamples {=
     self->cfg = kiss_fft_alloc(SAMPLE_SIZE,1, NULL,NULL);
+    lf_set_destructor(tsamples, sample_buffer_destructor);
+    lf_set_copy_constructor(tsamples, sample_buffer_copy);
   =}
 
   reaction(fsamples) -> tsamples {=
+    sample_buffer_t* array =  sample_buffer_ctor();
     kiss_fft_cpx fout[SAMPLE_SIZE];
 
-    kiss_fft(self->cfg, fsamples->value, fout);
+    kiss_fft(self->cfg, fsamples->value->samples, fout);
     for (int i=0; i<SAMPLE_SIZE; i++) {
-      tsamples->value[i] = fout[i].r/SAMPLE_SIZE;
+      array->samples[i] = fout[i].r/SAMPLE_SIZE;
     }
-    lf_set_present(tsamples);
+    lf_set(tsamples, array);
   =}
 }

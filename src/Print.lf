@@ -2,13 +2,14 @@ target C;
 
 preamble {=
   #include "common.h"
+  #include "buffer.h"
   #include <math.h>
   #include <string.h>
 =}
 
 reactor Print(filename: string = "waves.csv", pg_name: string = "plot.pg", only_last:bool=true) {
-  input tsamples: sample_buf_t
-  input fsamples: fsample_buf_t
+  input tsamples: sample_buffer_t *
+  input fsamples: fsample_buffer_t *
 
   state file: FILE* = {= NULL =}
   state cnt:int = 0;
@@ -25,7 +26,7 @@ reactor Print(filename: string = "waves.csv", pg_name: string = "plot.pg", only_
     FILE *gnuplotScript = fopen(self->pg_name, "w");
     if (gnuplotScript == NULL) {
         perror("Error creating Gnuplot script file");
-        return 1;
+        return;
     }
     
     fprintf(gnuplotScript, "set terminal pdf\n");
@@ -58,7 +59,7 @@ reactor Print(filename: string = "waves.csv", pg_name: string = "plot.pg", only_
       fprintf(self->file,
         "%f,%f\n",
         t,
-        tsamples->value[i]
+        tsamples->value->samples[i]
       );
       t += SAMPLE_STEP;
     }
@@ -82,7 +83,7 @@ reactor Print(filename: string = "waves.csv", pg_name: string = "plot.pg", only_
         "%i,%f\n",
         i,
         // FIXME: Is even the magnitude the right approach here?
-        sqrt(fsamples->value[i].r * fsamples->value[i].r + fsamples->value[i].i * fsamples->value[i].i)
+        sqrt(fsamples->value->samples[i].r * fsamples->value->samples[i].r + fsamples->value->samples[i].i * fsamples->value->samples[i].i)
       );
     }
   =}

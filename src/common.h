@@ -11,12 +11,6 @@
     
 #define PI 3.14159
 
-typedef SAMPLE_TYPE sample_buf_t[SAMPLE_SIZE];
-
-typedef kiss_fft_cpx fsample_buf_t[SAMPLE_SIZE];
-
-
-
 
 
 #endif

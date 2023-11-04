@@ -5,29 +5,12 @@ preamble {=
     #include "midi.h"
     #include "freq.h"
     #include "common.h"
+    #include "buffer.h"
     #include <math.h>
     #include <string.h>
 =}
 
-reactor AdditiveOscillator(sample_size:int=128) {
-  input freq:double
-  output samples: sample_buf_t
-  sine = new Oscillator(initialType={=OSC_SINE=})
-  tri = new Oscillator(initialType={=OSC_TRI=})
-
-  freq-> sine.freq
-  freq-> tri.freq
-
-  reaction(sine.samples, tri.samples) -> samples {=
-    for (int i = 0; i<SAMPLE_SIZE; i++) {
-      samples->value[i] = sine.samples->value[i]*0.5 + tri.samples->value[i]*0.5;
-    }
-    lf_set_present(samples);
-  =}
-}
-
 reactor Oscillator(initialType: osc_type_t = {=OSC_SINE=}, sample_size:int=128) {
-
   preamble {=
     double osc_sine(float *samples, double amplitude, double phase, double freq, double period) {
       for (int i = 0; i<SAMPLE_SIZE; i++) {
@@ -86,7 +69,7 @@ reactor Oscillator(initialType: osc_type_t = {=OSC_SINE=}, sample_size:int=128) 
   =}
 
   input freq:double
-  output samples: sample_buf_t
+  output samples: sample_buffer_t*
   input type: osc_type_t
 
   state phase: double = 0
@@ -95,6 +78,11 @@ reactor Oscillator(initialType: osc_type_t = {=OSC_SINE=}, sample_size:int=128) 
   state amplitude: double = 0.5
   state type: osc_type_t = initialType
   timer t(0, 23219 usec) // FIXME: What is the period? It is a function of the sample size.
+
+  reaction(startup) -> samples {=
+    lf_set_destructor(samples, sample_buffer_destructor);
+    lf_set_copy_constructor(samples, sample_buffer_copy);
+  =}
 
   reaction(freq) {=
     self->phase = 0;
@@ -107,22 +95,23 @@ reactor Oscillator(initialType: osc_type_t = {=OSC_SINE=}, sample_size:int=128) 
   =}
   
   reaction(t) -> samples {=
-    if (self->freq > 0) {
+    if (self->freq > 0) { // FIXME: Turn off oscillator also?
+      sample_buffer_t * buffer = sample_buffer_ctor();
       switch (self->type) {
         case OSC_SINE: 
-          self->phase = osc_sine(samples->value, self->amplitude, self->phase, self->freq, self->period);
+          self->phase = osc_sine(buffer->samples, self->amplitude, self->phase, self->freq, self->period);
           break;
         case OSC_SQUARE: 
-          self->phase = osc_square(samples->value, self->amplitude, self->phase, self->freq, self->period);
+          self->phase = osc_square(buffer->samples, self->amplitude, self->phase, self->freq, self->period);
           break;
         case OSC_SAW: 
-          self->phase = osc_saw(samples->value, self->amplitude, self->phase, self->freq, self->period);
+          self->phase = osc_saw(buffer->samples, self->amplitude, self->phase, self->freq, self->period);
           break;
         case OSC_TRI: 
-          self->phase = osc_tri(samples->value, self->amplitude, self->phase, self->freq, self->period);
+          self->phase = osc_tri(buffer->samples, self->amplitude, self->phase, self->freq, self->period);
           break;
       }
-      lf_set_present(samples);
+      lf_set(samples, buffer);
     } 
   =}
 }

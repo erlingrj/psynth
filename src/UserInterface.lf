@@ -6,14 +6,14 @@ import KeyboardInput from "lib/Keyboard.lf"
 preamble {= 
     #include <stdio.h>
     #include "common.h"
+    #include "buffer.h"
     #include "midi.h"
 =}
 
 reactor UserInterface(sample_size:int=128) {
-    input samples: sample_buf_t
+    input samples: sample_buffer_t*
     output midi_event:int[3]
 }
-
 
 reactor WebSocketUserInterface extends UserInterface {
     sock = new WebSocketServer(max_clients=1)
@@ -33,7 +33,7 @@ reactor WebSocketUserInterface extends UserInterface {
     reaction(samples) -> sock.send {=
         if (self->wsi) {
             for (int i = 0; i<SAMPLE_SIZE; i=i+16) {
-                self->buffer[self->idx++] = samples->value[i];
+                self->buffer[self->idx++] = samples->value->samples[i];
             }
             if (self->idx == SAMPLE_SIZE) {
                 char* message; web_socket_message_t* container = (web_socket_message_t*)malloc(sizeof(web_socket_message_t));
@@ -61,6 +61,58 @@ reactor WebSocketUserInterface extends UserInterface {
     =}
 }
 
+
+reactor FileInterface extends UserInterface {
+    preamble {=
+        #include <stdio.h>
+        #include <stdlib.h>
+        #include <fcntl.h>
+        #include <unistd.h>
+
+        void midi_reader_worker(void *action) {
+            unsigned char buffer[3];
+            while (1) {
+                // Read a MIDI message (3 bytes)
+                ssize_t bytes_read = read(midi_fd, buffer, sizeof(buffer));
+
+                // Check for errors or end-of-file
+                if (bytes_read < 0) {
+                    perror("Error reading MIDI data");
+                    break;
+                } else if (bytes_read == 0) {
+                    printf("End of file reached\n");
+                    break;
+                }
+                
+            // Process and print the MIDI data (you can replace this with your own logic)
+            printf("MIDI Data: %02x %02x %02x\n", (unsigned char)buffer[0], (unsigned char)buffer[1], (unsigned char)buffer[2]);
+            lf_schedule_copy(action, 0, sizeof(buffer), buffer);
+            }
+        }
+
+    =}
+
+
+    state midi_fd: FILE*;
+    physical action a: int[3];
+
+
+
+    reaction(startup) -> a {=
+        // Open the MIDI device file
+        self->midi_fd = open("/dev/midi1", O_RDONLY);
+        if (midi_fd == -1) {
+            perror("Failed to open MIDI device");
+            exit(1);file
+        }
+        // Start the thread that is blocking on reading input
+    =}
+
+    reaction(shutdown) {=
+        // Close the MIDI device file
+        close(midi_fd);
+    =}
+}
 
 reactor CursesUserInterface extends UserInterface {
     keyboard = new KeyboardInput()
@@ -179,7 +231,6 @@ reactor CursesUserInterface extends UserInterface {
                 memcpy(midi_event->value, &temp, sizeof(temp));
                 self->key_pressed[note] = true;
             }
-            lf_print("Got %d", note);
             lf_set_present(midi_event);
         } else if (program >= 0) {
             midi_program_change_t temp = MIDI_PROGRAM_CHANGE(program);
@@ -201,17 +252,14 @@ reactor CursesUserInterface extends UserInterface {
         }
     =}
     reaction(note_on) -> midi_event {=
-        lf_print("turn on %i", note_on->value);
         midi_note_on_t temp = MIDI_NOTE_ON(note_on->value);
         memcpy(midi_event->value, &temp, sizeof(temp));
         lf_set_present(midi_event);
     =}
 
     reaction(modulate) -> note_on, midi_event, modulate {=
-        lf_print("Modulate with: %i", modulate->value);
         for (int i=0; i<NOTE_G9; i++) {
             if (self->key_pressed[i]) {    
-                lf_print("turn off %i", i);
                 midi_note_on_t temp = MIDI_NOTE_OFF(i);
                 memcpy(midi_event->value, &temp, sizeof(temp));
                 self->key_pressed[i] = false;

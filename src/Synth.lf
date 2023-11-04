@@ -7,21 +7,24 @@ preamble {=
   #include "midi.h"
   #include "freq.h"
   #include "common.h"
+  #include "buffer.h"
   #include <string.h>
 =}
 
 reactor Synth(n_lanes: int = 4, sample_size:int=128) {
   input[2] midi_event: int[3]
-  output samples: sample_buf_t
+  output samples: sample_buffer_t*
   state lane_playing: int*
 
   lanes = new[n_lanes] Lane()
 
-  reaction(startup) {=
+  reaction(startup) -> samples {=
     self->lane_playing = (int *) malloc(self->n_lanes * sizeof(int));
     for (int i = 0; i<self->n_lanes; i++) {
         self->lane_playing[i] = -1;
     }
+    lf_set_destructor(samples, sample_buffer_destructor);
+    lf_set_copy_constructor(samples, sample_buffer_copy);
   =}
 
   reaction(midi_event) -> lanes.note_on, lanes.note_off, lanes.freq, lanes.osc_type {=
@@ -36,7 +39,7 @@ reactor Synth(n_lanes: int = 4, sample_size:int=128) {
         midi_note_off_t * note_off = (midi_note_off_t *) midi_msg;
         for (int i = 0; i<self->n_lanes; i++) {
           if (self->lane_playing[i] == note_off->pitch) {
-            lf_print("OFF: %i", note_off->pitch);
+            // lf_print("OFF: %i", note_off->pitch);
             lf_set(lanes[i].note_off, true);
             self->lane_playing[i] = -1;
             break;
@@ -45,11 +48,11 @@ reactor Synth(n_lanes: int = 4, sample_size:int=128) {
         break;
       }
       case NOTE_ON: {
-        lf_print("ON");
+        // lf_print("ON");
         midi_note_on_t * note_on = (midi_note_on_t *) midi_msg;
         for (int i = 0; i<self->n_lanes; i++) {
           if (self->lane_playing[i] == -1) {
-            lf_print("ON: %i", note_on->pitch);
+            // lf_print("ON: %i", note_on->pitch);
             lf_set(lanes[i].note_on, true);
             lf_set(lanes[i].freq, freqs[note_on->pitch]);
             self->lane_playing[i] = note_on->pitch;
@@ -70,6 +73,7 @@ reactor Synth(n_lanes: int = 4, sample_size:int=128) {
   =}
 
   reaction(lanes.samples) -> samples {=
+    sample_buffer_t * buffer = sample_buffer_ctor();
     int n_present = 0;
     for (int i=0; i<lanes_width; i++) {
       if (lanes[i].samples->is_present) {
@@ -80,12 +84,12 @@ reactor Synth(n_lanes: int = 4, sample_size:int=128) {
       float v = 0;
       for (int j=0; j<lanes_width; j++) {
         if (lanes[j].samples->is_present) {
-          v += lanes[j].samples->value[i]/n_present;
+          v += lanes[j].samples->value->samples[i]/n_present;
         }
       }
-      samples->value[i] = v;
+      buffer->samples[i] = v;
     }
-    lf_set_present(samples);
+    lf_set(samples, buffer);
   =}
 }
 
@@ -94,7 +98,7 @@ reactor Lane(bank_index: int = 0, sample_size:int=128) {
   input note_off: bool
   input freq: double
   input osc_type: osc_type_t
-  output samples: sample_buf_t
+  output samples: sample_buffer_t*
 
   osc = new Oscillator(initialType = {= OSC_SINE =})
   env = new ADSREnvelope()
