@@ -12,7 +12,7 @@ preamble {=
 
 reactor UserInterface(sample_size:int=128) {
     input samples: sample_buffer_t*
-    output midi_event:int[3]
+    output midi_event:char[3]
 }
 
 reactor WebSocketUserInterface extends UserInterface {
@@ -69,7 +69,7 @@ reactor FileInterface extends UserInterface {
         #include <fcntl.h>
         #include <unistd.h>
 
-        void midi_reader_worker(void *action) {
+        void* midi_reader_worker(void *action) {
             unsigned char buffer[3];
             while (1) {
                 // Read a MIDI message (3 bytes)
@@ -89,14 +89,11 @@ reactor FileInterface extends UserInterface {
             lf_schedule_copy(action, 0, sizeof(buffer), buffer);
             }
         }
-
     =}
 
-
     state midi_fd: FILE*;
-    physical action a: int[3];
-
-
+    state thread: lf_thread_t
+    physical action a: char[3];
 
     reaction(startup) -> a {=
         // Open the MIDI device file
@@ -106,6 +103,13 @@ reactor FileInterface extends UserInterface {
             exit(1);file
         }
         // Start the thread that is blocking on reading input
+        lf_thread_create(&self->thread, &midi_reader_worker, &a);
+    =}
+
+    reaction(a) -> midi_event {=
+        // FIXME: What is the correct API?
+        memcpy(midi_event->value, a->value, sizeof(char)*3);
+        lf_set_present(midi_event);
     =}
 
     reaction(shutdown) {=

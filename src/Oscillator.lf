@@ -77,7 +77,8 @@ reactor Oscillator(initialType: osc_type_t = {=OSC_SINE=}, sample_size:int=128) 
   state period: double = 0
   state amplitude: double = 0.5
   state type: osc_type_t = initialType
-  timer t(0, 23219 usec) // FIXME: What is the period? It is a function of the sample size.
+
+  timer t(0, 2902 usec)
 
   reaction(startup) -> samples {=
     lf_set_destructor(samples, sample_buffer_destructor);

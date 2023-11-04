@@ -12,7 +12,7 @@ preamble {=
 =}
 
 reactor Synth(n_lanes: int = 4, sample_size:int=128) {
-  input[2] midi_event: int[3]
+  input[2] midi_event: char[3]
   output samples: sample_buffer_t*
   state lane_playing: int*
 

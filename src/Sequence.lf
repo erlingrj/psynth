@@ -9,7 +9,7 @@ preamble {=
 
 
 reactor Sequence {
-    output midi_event:int[3]
+    output midi_event:char[3]
 }
 
 reactor RepeatedSequence(sequence: int[] = {48, 50, 52, 53, 49}, n_sequence: int = 5) extends Sequence {
