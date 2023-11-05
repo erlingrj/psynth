@@ -1,28 +1,37 @@
 #ifndef MIDI_H
 #define MIDI_H
 
+#define MIDI_MAX_PAYLOAD_BYTES 8
+
 typedef enum {
-    NOTE_OFF,  // binary: 000
-    NOTE_ON,  // binary: 001
-    PROGRAM_CHANGE
+    NOTE_OFF            = 8,
+    NOTE_ON             = 9, 
+    AFTER_TOUCH         = 0xA,
+    CONTROL_CHANGE      = 0xB,
+    PATCH_CHANGE        = 0xC,
+    CHANNEL_PRESSURE    = 0xD,
+    PITCH_BEND          = 0xE,
+    SYS_MSG             = 0xF
 } midi_type_t;
+
+// TODO: Create some macros to turn an enum into a string
 
 // Define the byte struct
 typedef struct {
     unsigned int channel:4;
-    midi_type_t type:3;
-    unsigned int unused;
+    midi_type_t type:4;
 } midi_status_t;
 
 // The base message for MIDI. Any MIDI message can be casted to this
 typedef struct {
     midi_status_t status;
+    char padding[MIDI_MAX_PAYLOAD_BYTES];
 } midi_base_msg_t;
 
 typedef struct {
     midi_status_t status;
-    unsigned char pitch;
-    unsigned char velocity;
+    unsigned int pitch;
+    unsigned int velocity;
 } midi_note_on_t;
 
 typedef struct {
@@ -35,6 +44,10 @@ typedef struct {
     midi_status_t status;
     unsigned char program;
 } midi_program_change_t;
+
+
+int midi_parser(char recv, midi_base_msg_t * output);
+void print_midi(midi_base_msg_t * msg);
 
 
 typedef enum {

@@ -8,11 +8,12 @@ preamble {=
     #include "common.h"
     #include "buffer.h"
     #include "midi.h"
+    #include "platform.h"
 =}
 
 reactor UserInterface(sample_size:int=128) {
     input samples: sample_buffer_t*
-    output midi_event:char[3]
+    output midi_event:midi_base_msg_t;
 }
 
 reactor WebSocketUserInterface extends UserInterface {
@@ -68,12 +69,16 @@ reactor FileInterface extends UserInterface {
         #include <stdlib.h>
         #include <fcntl.h>
         #include <unistd.h>
+        #include "midi.h"
+
+        int fd;
 
         void* midi_reader_worker(void *action) {
-            unsigned char buffer[3];
+            midi_base_msg_t msg;
+            char recv;
             while (1) {
                 // Read a MIDI message (3 bytes)
-                ssize_t bytes_read = read(midi_fd, buffer, sizeof(buffer));
+                ssize_t bytes_read = read(fd, &recv, 1);
 
                 // Check for errors or end-of-file
                 if (bytes_read < 0) {
@@ -83,38 +88,40 @@ reactor FileInterface extends UserInterface {
                     printf("End of file reached\n");
                     break;
                 }
-                
-            // Process and print the MIDI data (you can replace this with your own logic)
-            printf("MIDI Data: %02x %02x %02x\n", (unsigned char)buffer[0], (unsigned char)buffer[1], (unsigned char)buffer[2]);
-            lf_schedule_copy(action, 0, sizeof(buffer), buffer);
+                // printf("%02x \n", (unsigned char) recv);
+                if (midi_parser(recv, &msg) == 0) {
+                    // printf("FOUND MIDI MSG\n");
+                    lf_schedule_copy(action, 0, &msg, sizeof(msg));
+                    memset(&msg, 0, sizeof(msg));
+                }
             }
         }
     =}
 
-    state midi_fd: FILE*;
+    state midi_fd: int;
     state thread: lf_thread_t
-    physical action a: char[3];
+    physical action a: midi_base_msg_t
 
     reaction(startup) -> a {=
         // Open the MIDI device file
         self->midi_fd = open("/dev/midi1", O_RDONLY);
-        if (midi_fd == -1) {
-            perror("Failed to open MIDI device");
-            exit(1);file
+        if (self->midi_fd == -1) {
+            lf_print_error_and_exit("Failed to open MIDI device");
+            
         }
+        fd = self->midi_fd;
         // Start the thread that is blocking on reading input
-        lf_thread_create(&self->thread, &midi_reader_worker, &a);
+        lf_thread_create(&self->thread, &midi_reader_worker, a);
     =}
 
     reaction(a) -> midi_event {=
-        // FIXME: What is the correct API?
-        memcpy(midi_event->value, a->value, sizeof(char)*3);
+        memcpy(&midi_event->value, &a->value, sizeof(midi_base_msg_t));
         lf_set_present(midi_event);
     =}
 
     reaction(shutdown) {=
         // Close the MIDI device file
-        close(midi_fd);
+        close(self->midi_fd);
     =}
 }
 
