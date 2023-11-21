@@ -45,10 +45,7 @@ typedef struct {
     unsigned char program;
 } midi_program_change_t;
 
-
-int midi_parser(char recv, midi_base_msg_t * output);
 void print_midi(midi_base_msg_t * msg);
-
 
 typedef enum {
     OSC_SINE,
@@ -58,6 +55,24 @@ typedef enum {
     NUM_OSC
 } osc_type_t;
 
+typedef enum {
+  READ_CMD,
+  READ_DATA,
+} midi_parser_states_t;
+
+typedef struct midi_parser{
+  midi_parser_states_t state;
+  char buffer[3];
+  int buf_idx;
+  int bytes_to_read;
+  midi_type_t type;
+  int channel;
+  midi_base_msg_t msg;
+} midi_parser_t;
+
+int midi_parser(midi_parser_t *p, char recv);
+
+midi_parser_t *create_midi_parser();
 
 #define MIDI_NOTE_ON(x) {.status.channel=0, .status.type=NOTE_ON, .pitch=x, .velocity=60}
 #define MIDI_NOTE_OFF(x) {.status.channel=0, .status.type=NOTE_OFF, .pitch=x, .velocity=60}

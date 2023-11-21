@@ -74,7 +74,7 @@ reactor FileInterface extends UserInterface {
         int fd;
 
         void* midi_reader_worker(void *action) {
-            midi_base_msg_t msg;
+            midi_parser_t *parser = create_midi_parser();
             char recv;
             while (1) {
                 // Read a MIDI message (3 bytes)
@@ -89,10 +89,10 @@ reactor FileInterface extends UserInterface {
                     break;
                 }
                 // printf("%02x \n", (unsigned char) recv);
-                if (midi_parser(recv, &msg) == 0) {
+                if (midi_parser(parser, recv)) {
                     // printf("FOUND MIDI MSG\n");
-                    lf_schedule_copy(action, 0, &msg, sizeof(msg));
-                    memset(&msg, 0, sizeof(msg));
+                    lf_schedule_copy(action, 0, &parser->msg, 1);
+                    memset(&parser->msg, 0, sizeof(parser->msg));
                 }
             }
         }
