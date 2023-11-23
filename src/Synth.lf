@@ -2,6 +2,7 @@ target C
 
 import Oscillator from "Oscillator.lf"
 import ADSREnvelope from "Envelope.lf"
+import Compressor from "Compressor.lf"
 
 preamble {=
   #include "midi.h"
@@ -17,17 +18,22 @@ reactor Synth(n_lanes: int = 4, sample_size:int=128) {
   state lane_playing: int*
 
   lanes = new[n_lanes] Lane()
+  merge = new Merge(num_lanes=n_lanes)
+  compressor = new Compressor()
 
-  reaction(startup) -> samples {=
+  lanes.samples -> merge.in
+  merge.out -> compressor.samples_raw
+  compressor.samples -> samples
+  
+
+  reaction(startup) {=
     self->lane_playing = (int *) malloc(self->n_lanes * sizeof(int));
     for (int i = 0; i<self->n_lanes; i++) {
         self->lane_playing[i] = -1;
     }
-    lf_set_destructor(samples, sample_buffer_destructor);
-    lf_set_copy_constructor(samples, sample_buffer_copy);
   =}
 
-  reaction(midi_event) -> lanes.note_on, lanes.note_off, lanes.freq, lanes.osc_type {=
+  reaction(midi_event) -> lanes.note_on, lanes.note_off, lanes.freq, lanes.osc_type, lanes.velocity {=
     midi_base_msg_t * midi_msg = &midi_event->value;
 
     print_midi(midi_msg);
@@ -35,7 +41,7 @@ reactor Synth(n_lanes: int = 4, sample_size:int=128) {
     // Some MIDI keyboards dont send NOTE_OFF only NOTE_ON with velocity=0
     if (midi_msg->status.type == NOTE_ON && 
         ((midi_note_on_t *) midi_msg)->velocity==0) {
-      midi_msg->status.type = NOTE_OFF;
+        midi_msg->status.type = NOTE_OFF;
     }
 
     switch (midi_msg->status.type) {
@@ -44,6 +50,7 @@ reactor Synth(n_lanes: int = 4, sample_size:int=128) {
         for (int i = 0; i<self->n_lanes; i++) {
           if (self->lane_playing[i] == note_off->pitch) {
             lf_set(lanes[i].note_off, true);
+            lf_print("OFF: Found note at lane %d", i);
             self->lane_playing[i] = -1;
             break;
           }
@@ -56,6 +63,8 @@ reactor Synth(n_lanes: int = 4, sample_size:int=128) {
           if (self->lane_playing[i] == -1) {
             lf_set(lanes[i].note_on, true);
             lf_set(lanes[i].freq, freqs[note_on->pitch]);
+            lf_set(lanes[i].velocity, note_on->velocity);
+            lf_print("ON: Found note at lane %d", i);
             self->lane_playing[i] = note_on->pitch;
             break;
           }
@@ -72,32 +81,13 @@ reactor Synth(n_lanes: int = 4, sample_size:int=128) {
       }
     }
   =}
-
-  reaction(lanes.samples) -> samples {=
-    sample_buffer_t * buffer = sample_buffer_ctor();
-    int n_present = 0;
-    for (int i=0; i<lanes_width; i++) {
-      if (lanes[i].samples->is_present) {
-        n_present++;
-      }
-    }
-    for (int i=0; i<SAMPLE_SIZE; i++) {
-      float v = 0;
-      for (int j=0; j<lanes_width; j++) {
-        if (lanes[j].samples->is_present) {
-          v += lanes[j].samples->value->samples[i]/n_present;
-        }
-      }
-      buffer->samples[i] = v;
-    }
-    lf_set(samples, buffer);
-  =}
 }
 
 reactor Lane(bank_index: int = 0, sample_size:int=128) {
   input note_on: bool
   input note_off: bool
   input freq: double
+  input velocity: double
   input osc_type: osc_type_t
   output samples: sample_buffer_t*
 
@@ -106,9 +96,33 @@ reactor Lane(bank_index: int = 0, sample_size:int=128) {
 
   note_on -> env.note_on
   note_off -> env.note_off
+  velocity -> env.velocity
   freq -> osc.freq
   osc_type -> osc.type
 
   osc.samples -> env.samples_raw
   env.samples -> samples
+  env.dead -> osc.dead
+}
+
+reactor Merge(num_lanes:int=1) {
+  input [num_lanes] in:sample_buffer_t*
+  output out:sample_buffer_t*
+
+  reaction(startup) -> out {=
+    lf_set_destructor(out, sample_buffer_destructor);
+    lf_set_copy_constructor(out, sample_buffer_copy);
+  =}
+
+  reaction(in) -> out {=
+    sample_buffer_t * buffer = sample_buffer_ctor();
+    for (int i=0; i<in_width; i++) {
+      if (in[i]->is_present) {
+        for (int j=0; j<SAMPLE_SIZE; j++) {
+          buffer->samples[j] += in[i]->value->samples[j];
+        }
+      }
+    }
+    lf_set(out, buffer);
+  =}
 }

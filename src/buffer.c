@@ -11,6 +11,20 @@ fsample_buffer_t _fdata[NUM_BUFFERS];
 bool _used[NUM_BUFFERS] = {false};
 bool _fused[NUM_BUFFERS] = {false};
 
+lf_mutex_t lock;
+
+int buffers_used=0;
+
+void print_used() {
+  printf("Used: ");
+  for (int i = 0; i<NUM_BUFFERS; i++) {
+    if (_used[i]) {
+      printf("%d ", i);
+    }
+  }
+  printf("\n");
+}
+
 static int get_buf_idx(void * buf, bool tdomain) {
   int idx;
   if (tdomain) {
@@ -22,7 +36,10 @@ static int get_buf_idx(void * buf, bool tdomain) {
 }
 
 void* _buffer_ctor(bool tdomain) {
-  lf_critical_section_enter(NULL);
+  if (lf_critical_section_enter(NULL) != 0) {
+    lf_print_error_and_exit("Could not enter critical section");
+  }
+  buffers_used++;
   void* res = NULL;
   for (int i = 0; i<NUM_BUFFERS; i++) {
     if (tdomain) {
@@ -45,21 +62,29 @@ void* _buffer_ctor(bool tdomain) {
 }
 
 void _buffer_destructor(void* array, bool tdomain) {
+  if (lf_critical_section_enter(NULL) != 0) {
+    lf_print_error_and_exit("Could not enter critical section");
+  }
+  buffers_used--;
   int idx = get_buf_idx(array, tdomain);
   if (idx >= NUM_BUFFERS) {
-    return;
+    lf_print_error_and_exit("ERROR Tried to free something that wasnt allocated");
   }
   if (tdomain) {
     if (!_used[idx]) {
       lf_print_error_and_exit("ERROR Tried to free something that wasnt allocated");
     }
+    memset(&_data[idx],0,sizeof(sample_buffer_t));
     _used[idx] = false;
   } else {
     if (!_fused[idx]) {
       lf_print_error_and_exit("ERROR Tried to free something that wasnt allocated");
     }
+    memset(&_fdata[idx],0,sizeof(fsample_buffer_t));
     _fused[idx] = false;
   }
+  // print_used();
+  lf_critical_section_exit(NULL);
 }
 
 fsample_buffer_t* fsample_buffer_ctor() {

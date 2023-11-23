@@ -11,7 +11,6 @@ import Synth from "Synth.lf"
 import FileInterface as UserInterface from "UserInterface.lf"
 import FFT, IFFT from "FFT.lf"
 import Print from "Print.lf"
-import MidiParser from "MidiParser.lf"
 import OscillatorChangeSequence from "Sequence.lf"
 
 main reactor {

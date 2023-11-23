@@ -1,0 +1,39 @@
+target C;
+
+preamble {=
+  #include "common.h"
+  #include "buffer.h"
+=}
+
+reactor Compressor {
+    mutable input samples_raw: sample_buffer_t*
+    output samples: sample_buffer_t*
+
+    reaction(samples_raw) -> samples {=
+      SAMPLE_TYPE min = 0;
+      SAMPLE_TYPE max = 0;
+      SAMPLE_TYPE compress = 0;
+
+      for (int i = 0; i<SAMPLE_SIZE; i++) {
+        SAMPLE_TYPE v = samples_raw->value->samples[i];
+        if (v < min) {
+          min = v;
+        }
+        if (v > max) {
+          max = v;
+        }
+      }
+      max = MAX(max, -min);
+      // lf_print("max=%f", max);
+
+      // Compress
+      if (max > 1.0) {
+        // lf_print("Compress maddafakka");
+        for (int i = 0; i<SAMPLE_SIZE; i++) {
+          samples_raw->value->samples[i] /= max;
+        }
+      }
+
+      lf_set_token(samples, samples_raw->token);
+    =}
+}

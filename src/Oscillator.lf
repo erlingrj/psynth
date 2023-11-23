@@ -71,12 +71,14 @@ reactor Oscillator(initialType: osc_type_t = {=OSC_SINE=}, sample_size:int=128) 
   input freq:double
   output samples: sample_buffer_t*
   input type: osc_type_t
+  input dead:bool
 
   state phase: double = 0
   state freq: double = 0
   state period: double = 0
   state amplitude: double = 0.5
   state type: osc_type_t = initialType
+  state on:bool = false;
 
   timer t(0, 2902 usec)
 
@@ -89,14 +91,16 @@ reactor Oscillator(initialType: osc_type_t = {=OSC_SINE=}, sample_size:int=128) 
     self->phase = 0;
     self->freq = freq->value;
     self->period = 1/freq->value;
+    self->on = true;
   =}
+
 
   reaction(type) {=
     self->type = type->value;
   =}
   
   reaction(t) -> samples {=
-    if (self->freq > 0) { // FIXME: Turn off oscillator also?
+    if (self->on) {
       sample_buffer_t * buffer = sample_buffer_ctor();
       switch (self->type) {
         case OSC_SINE: 
@@ -114,5 +118,9 @@ reactor Oscillator(initialType: osc_type_t = {=OSC_SINE=}, sample_size:int=128) 
       }
       lf_set(samples, buffer);
     } 
+  =}
+  
+  reaction(dead) {=
+    self->on = false;
   =}
 }

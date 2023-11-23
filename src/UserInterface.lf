@@ -71,22 +71,20 @@ reactor FileInterface extends UserInterface {
         #include <unistd.h>
         #include "midi.h"
 
-        int fd;
+        bool stop = false;
 
-        void* midi_reader_worker(void *action) {
-            midi_parser_t *parser = create_midi_parser();
+        static void midi_reader_loop(int fd, void *action, midi_parser_t *parser) {
             char recv;
-            while (1) {
+            while (!stop) {
                 // Read a MIDI message (3 bytes)
                 ssize_t bytes_read = read(fd, &recv, 1);
-
                 // Check for errors or end-of-file
                 if (bytes_read < 0) {
-                    perror("Error reading MIDI data");
-                    break;
+                    lf_print("Error reading from MIDI device");
+                    return;
                 } else if (bytes_read == 0) {
-                    printf("End of file reached\n");
-                    break;
+                    lf_print("Error reading from MIDI device");
+                    return;
                 }
                 // printf("%02x \n", (unsigned char) recv);
                 if (midi_parser(parser, recv)) {
@@ -95,21 +93,27 @@ reactor FileInterface extends UserInterface {
                     memset(&parser->msg, 0, sizeof(parser->msg));
                 }
             }
+            close(fd);
         }
+
+        void* midi_reader_worker(void *action) {
+            midi_parser_t *parser = create_midi_parser();
+            while (!stop) {
+                // Open the MIDI device file
+                int fd = open("/dev/midi1", O_RDONLY);
+                if (fd > 0 ) {
+                    lf_print("Found MIDI device!");
+                    midi_reader_loop(fd, action, parser);
+                }
+            }
+        }
+        
     =}
 
-    state midi_fd: int;
     state thread: lf_thread_t
     physical action a: midi_base_msg_t
 
     reaction(startup) -> a {=
-        // Open the MIDI device file
-        self->midi_fd = open("/dev/midi1", O_RDONLY);
-        if (self->midi_fd == -1) {
-            lf_print_error_and_exit("Failed to open MIDI device");
-            
-        }
-        fd = self->midi_fd;
         // Start the thread that is blocking on reading input
         lf_thread_create(&self->thread, &midi_reader_worker, a);
     =}
@@ -120,8 +124,8 @@ reactor FileInterface extends UserInterface {
     =}
 
     reaction(shutdown) {=
-        // Close the MIDI device file
-        close(self->midi_fd);
+        void* thread_exit_status;
+        lf_thread_join(self->thread, &thread_exit_status);
     =}
 }
 

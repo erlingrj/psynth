@@ -11,6 +11,12 @@
     
 #define PI 3.14159
 
+#ifndef MIN
+#define MIN(x, y)  ((x) < (y) ? (x) : (y))
+#endif
+#ifndef MAX
+#define MAX(x, y)  ((x) > (y) ? (x) : (y))
+#endif
 
 
 #endif
