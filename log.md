@@ -1,3 +1,14 @@
+# Nov 25
+- Found the mem error. It was due to a data race in the runtime. 
+- I am seeing occasionally a very hard-to-reproduce error where we have an event with tag NEVER being dequeued when we
+are about to shutdown...
+
+
+# Nov 24
+- Something is off. We get many many unfreed messages. They do not seem to be from my buffer code. But where else? It is either the buffers, or it is the physical action. But it only appears when we have multiple lanes (that is a big hint) also only appears when I am pressing multiple keys together. 
+- These hints seems to point in different direction. Is it the physical action or my token stuff that is at fault?
+- I think the way to debug this is to look at log messages and just trace out if there is a one-to-one mapping here. I am pretty sure it is the 
+
 # Nov 23
 - I was not able to get the Compressor properly working. And their are some isses:
 - I get NET with -1234567 tag

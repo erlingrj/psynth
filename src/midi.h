@@ -14,6 +14,12 @@ typedef enum {
     SYS_MSG             = 0xF
 } midi_type_t;
 
+typedef enum {
+    SOUND_VARIATION = 70,
+    RELEASE_TIME = 72,
+    ATTACK_TIME = 73,
+} midi_controller_type_t;
+
 // TODO: Create some macros to turn an enum into a string
 
 // Define the byte struct
@@ -45,13 +51,19 @@ typedef struct {
     unsigned char program;
 } midi_program_change_t;
 
+typedef struct {
+    midi_status_t status;
+    unsigned char controller;
+    unsigned char value;
+} midi_controller_change_t;
+
 void print_midi(midi_base_msg_t * msg);
 
 typedef enum {
-    OSC_SINE,
-    OSC_SQUARE,
-    OSC_SAW,
-    OSC_TRI,
+    OSC_SINE    = 0,
+    OSC_SQUARE  = 1,
+    OSC_SAW     = 2,
+    OSC_TRI     = 3,
     NUM_OSC
 } osc_type_t;
 

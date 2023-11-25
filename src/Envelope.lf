@@ -1,15 +1,16 @@
 target C;
 
 preamble {=
-    #include "common.h"
-    #include "buffer.h"
+  #include "common.h"
+  #include "buffer.h"
+  #include "midi.h"
 =}
 
 reactor AmplitudeEnvelope(sample_size:int=128) {
-    input note_on: bool
-    input note_off: bool
-    mutable input samples_raw: sample_buffer_t*
-    output samples: sample_buffer_t*
+  input note_on: bool
+  input note_off: bool
+  mutable input samples_raw: sample_buffer_t*
+  output samples: sample_buffer_t*
 }
 
 // An amplitude envelope with 4 parameters. Uses modal reactors to
@@ -20,6 +21,7 @@ reactor ADSREnvelope(
   sustain:float = 0.8,
   release:time = 40 msec) extends AmplitudeEnvelope 
 {
+  input ctrl: midi_controller_change_t
   input velocity: double
   output dead:bool
   state attack_rate: double
@@ -34,13 +36,29 @@ reactor ADSREnvelope(
 
   state amp: double = 0
   
-  reaction(startup) {=
+  reaction(ctrl) {=
+    switch (ctrl->value.controller) {
+      case RELEASE_TIME: {
+        interval_t release = MSEC(500) * ctrl->value.value/127;  
+        self->release_rate = self->sustain/release;
+        break;
+      }
+      case ATTACK_TIME: {
+        interval_t attack = MSEC(500) * ctrl->value.value/127;  
+        self->attack_rate = 1.0/attack;
+        break;
+
+      }
+    }
+  =}
+
+  reaction(startup) -> samples {=
     self->attack_rate = 1.0/self->attack;  
     self->decay_rate= (1.0 - self->sustain)/self->decay;  
     self->release_rate = self->sustain/self->release;  
 
-    // lf_set_destructor(samples, sample_buffer_destructor);
-    // lf_set_copy_constructor(samples, sample_buffer_copy);
+    lf_set_destructor(samples, sample_buffer_destructor);
+    lf_set_copy_constructor(samples, sample_buffer_copy);
   =}
 
   initial mode Idle {

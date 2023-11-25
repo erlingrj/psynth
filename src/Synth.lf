@@ -12,18 +12,15 @@ preamble {=
   #include <string.h>
 =}
 
-reactor Synth(n_lanes: int = 4, sample_size:int=128) {
+reactor Synth(n_lanes: int = 5, sample_size:int=128) {
   input midi_event: midi_base_msg_t
   output samples: sample_buffer_t*
   state lane_playing: int*
 
   lanes = new[n_lanes] Lane()
   merge = new Merge(num_lanes=n_lanes)
-  compressor = new Compressor()
-
   lanes.samples -> merge.in
-  merge.out -> compressor.samples_raw
-  compressor.samples -> samples
+  merge.out -> samples
   
 
   reaction(startup) {=
@@ -33,7 +30,7 @@ reactor Synth(n_lanes: int = 4, sample_size:int=128) {
     }
   =}
 
-  reaction(midi_event) -> lanes.note_on, lanes.note_off, lanes.freq, lanes.osc_type, lanes.velocity {=
+  reaction(midi_event) -> lanes.note_on, lanes.note_off, lanes.ctrl {=
     midi_base_msg_t * midi_msg = &midi_event->value;
 
     print_midi(midi_msg);
@@ -49,8 +46,9 @@ reactor Synth(n_lanes: int = 4, sample_size:int=128) {
         midi_note_off_t * note_off = (midi_note_off_t *) midi_msg;
         for (int i = 0; i<self->n_lanes; i++) {
           if (self->lane_playing[i] == note_off->pitch) {
-            lf_set(lanes[i].note_off, true);
-            lf_print("OFF: Found note at lane %d", i);
+            memcpy(&lanes[i].note_off->value, midi_msg, sizeof(midi_note_off_t));
+            lf_set_present(lanes[i].note_off);
+            // lf_print("OFF: Found note at lane %d", i);
             self->lane_playing[i] = -1;
             break;
           }
@@ -61,9 +59,8 @@ reactor Synth(n_lanes: int = 4, sample_size:int=128) {
         midi_note_on_t * note_on = (midi_note_on_t *) midi_msg;
         for (int i = 0; i<self->n_lanes; i++) {
           if (self->lane_playing[i] == -1) {
-            lf_set(lanes[i].note_on, true);
-            lf_set(lanes[i].freq, freqs[note_on->pitch]);
-            lf_set(lanes[i].velocity, note_on->velocity);
+            memcpy(&lanes[i].note_on->value, midi_msg, sizeof(midi_note_on_t));
+            lf_set_present(lanes[i].note_on);
             lf_print("ON: Found note at lane %d", i);
             self->lane_playing[i] = note_on->pitch;
             break;
@@ -73,32 +70,54 @@ reactor Synth(n_lanes: int = 4, sample_size:int=128) {
       }
 
       case CONTROL_CHANGE: {
-        midi_program_change_t * program = (midi_program_change_t*) midi_msg;
-        for (int i = 0; i<self->n_lanes; i++) {
-          lf_set(lanes[i].osc_type, program->program);
+        midi_controller_change_t * program = (midi_controller_change_t *) midi_msg;
+        switch(program->controller) {
+          case SOUND_VARIATION:
+          case RELEASE_TIME:
+          case ATTACK_TIME: {
+            for (int i = 0; i<self->n_lanes; i++) {
+              memcpy(&lanes[i].ctrl->value, program, sizeof(midi_controller_change_t));
+              lf_set_present(lanes[i].ctrl);
+            }
+            break;
+          }
         }
-        break;
       }
     }
   =}
 }
 
-reactor Lane(bank_index: int = 0, sample_size:int=128) {
-  input note_on: bool
-  input note_off: bool
-  input freq: double
-  input velocity: double
-  input osc_type: osc_type_t
+reactor Lane(bank_index: int = 0) {
+  input note_on: midi_note_on_t
+  input note_off: midi_note_off_t
+  input ctrl: midi_controller_change_t
   output samples: sample_buffer_t*
 
   osc = new Oscillator(initialType = {= OSC_SINE =})
   env = new ADSREnvelope()
 
-  note_on -> env.note_on
-  note_off -> env.note_off
-  velocity -> env.velocity
-  freq -> osc.freq
-  osc_type -> osc.type
+  reaction(note_on) -> env.note_on, env.velocity, osc.freq {=
+    lf_set(env.note_on, true);
+    lf_set(env.velocity, note_on->value.velocity);
+    lf_set(osc.freq, freqs[note_on->value.pitch]);
+  =}
+
+  reaction(note_off) -> env.note_off {=
+    lf_set(env.note_off, true);
+  =}
+
+  reaction(ctrl) -> osc.type, env.ctrl {=
+    if (ctrl->value.controller == SOUND_VARIATION) {
+      osc_type_t osc_type = ctrl->value.value >> 5;
+      if(osc_type > 3) {
+        lf_print_error_and_exit("Error in oscillator type calculation");
+      }
+      lf_set(osc.type, osc_type);
+    } else {
+      memcpy(&env.ctrl->value, &ctrl->value, sizeof(midi_controller_change_t));
+      lf_set_present(env.ctrl);
+    }
+  =}
 
   osc.samples -> env.samples_raw
   env.samples -> samples
