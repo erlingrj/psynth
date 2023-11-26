@@ -16,7 +16,7 @@ lf_mutex_t lock;
 int buffers_used=0;
 
 void print_used() {
-  printf("Used: ");
+  printf("%d Used: ", buffers_used);
   for (int i = 0; i<NUM_BUFFERS; i++) {
     if (_used[i]) {
       printf("%d ", i);

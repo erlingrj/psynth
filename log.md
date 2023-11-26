@@ -1,7 +1,19 @@
+# Nov 26
+- I found that increasing the priority of my threads does improve the functioning of this program.
+- Found another race condition in the token-handling logic...
+- It seems actually, that my problems with "clipping" and whatnot is not caused by the amplitude, but wierd jumps in the
+outputted signal. This might actually be bugs in my ADSR envelope. Interesting. Will have to take a look at that soon.
+
 # Nov 25
 - Found the mem error. It was due to a data race in the runtime. 
 - I am seeing occasionally a very hard-to-reproduce error where we have an event with tag NEVER being dequeued when we
 are about to shutdown...
+- I am still seeing some memory issues I think, because occasionally, we end up running out of buffers for my custom allocator...
+- Also non-deterministically getting: `FATAL ERROR: midi_parser: buf_idx=3`at startup. Some faulty messages in the buffer somehow
+- A first stab at a very simple filter. But it doesnt really work. I have to read more up on audio processing:
+1. How should i interpret the FFT output. It is an array of complex numbers what is the real and imaginary part of each number? 
+What is the interpretation of the index o each number. I think that is the frequency?
+2. How should such filter 
 
 
 # Nov 24

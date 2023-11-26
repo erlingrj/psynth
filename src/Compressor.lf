@@ -28,12 +28,34 @@ reactor Compressor {
 
       // Compress
       if (max > 1.0) {
-        // lf_print("Compress maddafakka");
+        lf_print("Compress maddafakka");
         for (int i = 0; i<SAMPLE_SIZE; i++) {
-          samples_raw->value->samples[i] /= max;
+          samples_raw->value->samples[i] /= 4*max;
+        }
+      } else {
+        for (int i = 0; i<SAMPLE_SIZE; i++) {
+          samples_raw->value->samples[i] /= 4;
         }
       }
 
+      lf_set_token(samples, samples_raw->token);
+    =}
+}
+
+reactor Clipper(max:float=0.5){
+    mutable input samples_raw: sample_buffer_t*
+    output samples: sample_buffer_t*
+
+    reaction(samples_raw) -> samples {=
+      for (int i = 0; i<SAMPLE_SIZE; i++) {
+        SAMPLE_TYPE *v = &samples_raw->value->samples[i];
+        if (*v < -self->max) {
+          *v = -self->max;
+        }
+        if (*v > self->max) {
+          *v = self->max;
+        }
+      }
       lf_set_token(samples, samples_raw->token);
     =}
 }

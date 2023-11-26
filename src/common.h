@@ -2,6 +2,7 @@
 #define COMMON_H
 
 #include "kiss_fft.h"
+#include <math.h>
 
 #define SAMPLE_SIZE 128
 #define SAMPLE_TYPE float
@@ -18,5 +19,7 @@
 #define MAX(x, y)  ((x) > (y) ? (x) : (y))
 #endif
 
+#define MAG(x) (x.i*x.i + x.r*x.r)
+#define PHASE(x) (atan(x.i/x.r))
 
 #endif

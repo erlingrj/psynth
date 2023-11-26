@@ -4,6 +4,7 @@
 #define MIDI_MAX_PAYLOAD_BYTES 8
 
 typedef enum {
+    INVALID             = 0,
     NOTE_OFF            = 8,
     NOTE_ON             = 9, 
     AFTER_TOUCH         = 0xA,
@@ -16,6 +17,7 @@ typedef enum {
 
 typedef enum {
     SOUND_VARIATION = 70,
+    TIMBRE = 71,
     RELEASE_TIME = 72,
     ATTACK_TIME = 73,
 } midi_controller_type_t;

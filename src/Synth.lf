@@ -2,7 +2,9 @@ target C
 
 import Oscillator from "Oscillator.lf"
 import ADSREnvelope from "Envelope.lf"
-import Compressor from "Compressor.lf"
+import Compressor, Clipper from "Compressor.lf"
+import FFT, IFFT from "FFT.lf"
+import SimpleFilter from "Filter.lf"
 
 preamble {=
   #include "midi.h"
@@ -12,15 +14,28 @@ preamble {=
   #include <string.h>
 =}
 
-reactor Synth(n_lanes: int = 5, sample_size:int=128) {
+reactor Synth(n_lanes: int = 5) {
   input midi_event: midi_base_msg_t
   output samples: sample_buffer_t*
   state lane_playing: int*
 
   lanes = new[n_lanes] Lane()
   merge = new Merge(num_lanes=n_lanes)
+  
+  fft = new FFT()
+  ifft = new IFFT()
+  filter = new SimpleFilter()
+  compressor = new Compressor()
+
   lanes.samples -> merge.in
-  merge.out -> samples
+  // merge.out -> fft.tsamples
+  // fft.fsamples -> filter.in
+  // filter.out -> ifft.fsamples
+  // ifft.tsamples -> samples
+  merge.out -> compressor.samples_raw
+  compressor.samples -> samples
+
+
   
 
   reaction(startup) {=
@@ -30,7 +45,7 @@ reactor Synth(n_lanes: int = 5, sample_size:int=128) {
     }
   =}
 
-  reaction(midi_event) -> lanes.note_on, lanes.note_off, lanes.ctrl {=
+  reaction(midi_event) -> lanes.note_on, lanes.note_off, lanes.ctrl, filter.ctrl {=
     midi_base_msg_t * midi_msg = &midi_event->value;
 
     print_midi(midi_msg);
@@ -81,6 +96,11 @@ reactor Synth(n_lanes: int = 5, sample_size:int=128) {
             }
             break;
           }
+          case TIMBRE:
+            memcpy(&filter.ctrl->value, program, sizeof(midi_controller_change_t));
+            lf_set_present(filter.ctrl);
+            break;
+
         }
       }
     }
@@ -134,6 +154,13 @@ reactor Merge(num_lanes:int=1) {
   =}
 
   reaction(in) -> out {=
+    int n_present = 0;
+    for (int i = 0; i<in_width; i++) {
+      if (in[i]->is_present) {
+        n_present++;
+      }
+    }
+
     sample_buffer_t * buffer = sample_buffer_ctor();
     for (int i=0; i<in_width; i++) {
       if (in[i]->is_present) {

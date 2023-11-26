@@ -9,7 +9,7 @@ preamble {=
     #include "buffer.h"
 =}
 
-reactor SoundOutput(sample_size:int=128) {
+reactor SoundOutput {
     input samples: sample_buffer_t*
     state spec: pa_sample_spec;
     state s: pa_simple*
@@ -26,5 +26,8 @@ reactor SoundOutput(sample_size:int=128) {
     
     reaction(samples) {= 
         pa_simple_write(self->s, samples->value->samples, SAMPLE_NUM_BYTES, NULL);
+        #if defined(NDEBUG)
+            lf_print_error_and_exit("NDEBUG defined");
+        #endif
     =}
 }

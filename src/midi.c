@@ -18,6 +18,7 @@ midi_parser_t *create_midi_parser() {
   if (!p) return NULL;
   p->state=READ_CMD;
   p->buf_idx = 0;
+  p->type = INVALID;
   return p;
 }
 
@@ -80,7 +81,7 @@ int midi_parser(midi_parser_t *p, char recv) {
             break;
           }
           break;
-      } else {
+      } else if (p->type != INVALID){
         // We did not receive a command message. Check if we can 
         // do fallthrough.
           MIDI_DBG_PRINT(", RUNNING_STATUS  ");
@@ -88,6 +89,8 @@ int midi_parser(midi_parser_t *p, char recv) {
           p->msg.status.channel = p->channel;
           p->msg.status.type = p->type;
           p->buf_idx=0;
+      } else {
+        break;
       }
     }
 

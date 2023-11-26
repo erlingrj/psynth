@@ -10,7 +10,7 @@ preamble {=
     #include <string.h>
 =}
 
-reactor Oscillator(initialType: osc_type_t = {=OSC_SINE=}, sample_size:int=128) {
+reactor Oscillator(initialType: osc_type_t = {=OSC_SINE=}) {
   preamble {=
     double osc_sine(float *samples, double amplitude, double phase, double freq, double period) {
       for (int i = 0; i<SAMPLE_SIZE; i++) {
@@ -37,9 +37,9 @@ reactor Oscillator(initialType: osc_type_t = {=OSC_SINE=}, sample_size:int=128) 
     double osc_square(float *samples, double amplitude, double phase, double freq, double period) {
       for (int i = 0; i<SAMPLE_SIZE; i++) {
         if (phase < period/2) {
-          samples[i] = -amplitude/2;
+          samples[i] = -amplitude;
         } else {
-          samples[i] = amplitude/2;
+          samples[i] = amplitude;
         }
         phase += SAMPLE_STEP;
         if (phase >= period) {
@@ -76,15 +76,21 @@ reactor Oscillator(initialType: osc_type_t = {=OSC_SINE=}, sample_size:int=128) 
   state phase: double = 0
   state freq: double = 0
   state period: double = 0
-  state amplitude: double = 0.5
+  state amplitude: double = 1
   state type: osc_type_t = initialType
   state on:bool = false;
+  
+  state sample_period: interval_t 
+  state sample_step:double
 
-  timer t(0, 2902 usec)
+  logical action a
 
-  reaction(startup) -> samples {=
+  reaction(startup) -> samples, a {=
     lf_set_destructor(samples, sample_buffer_destructor);
     lf_set_copy_constructor(samples, sample_buffer_copy);
+    self->sample_period = SEC(SAMPLE_SIZE)/SAMPLE_RATE;
+    lf_print("Sample period = %li", self->sample_period);
+    lf_schedule(a,self->sample_period);
   =}
 
   reaction(freq) {=
@@ -99,7 +105,7 @@ reactor Oscillator(initialType: osc_type_t = {=OSC_SINE=}, sample_size:int=128) 
     self->type = type->value;
   =}
   
-  reaction(t) -> samples {=
+  reaction(a) -> samples,a {=
     if (self->on) {
       sample_buffer_t * buffer = sample_buffer_ctor();
       switch (self->type) {
@@ -117,7 +123,8 @@ reactor Oscillator(initialType: osc_type_t = {=OSC_SINE=}, sample_size:int=128) 
           break;
       }
       lf_set(samples, buffer);
-    } 
+    }
+    lf_schedule(a, self->sample_period);
   =}
   
   reaction(dead) {=

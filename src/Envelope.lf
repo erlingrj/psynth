@@ -6,7 +6,7 @@ preamble {=
   #include "midi.h"
 =}
 
-reactor AmplitudeEnvelope(sample_size:int=128) {
+reactor AmplitudeEnvelope {
   input note_on: bool
   input note_off: bool
   mutable input samples_raw: sample_buffer_t*
@@ -39,13 +39,13 @@ reactor ADSREnvelope(
   reaction(ctrl) {=
     switch (ctrl->value.controller) {
       case RELEASE_TIME: {
-        interval_t release = MSEC(500) * ctrl->value.value/127;  
-        self->release_rate = self->sustain/release;
+        self->release = SEC(2) * ctrl->value.value/127;  
+        self->release_rate = self->sustain/self->release;
         break;
       }
       case ATTACK_TIME: {
-        interval_t attack = MSEC(500) * ctrl->value.value/127;  
-        self->attack_rate = 1.0/attack;
+        self->attack = SEC(2) * ctrl->value.value/127;  
+        self->attack_rate = 1.0/self->attack;
         break;
 
       }

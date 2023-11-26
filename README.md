@@ -29,7 +29,7 @@ bin/Main
 - [x] Add multiple lanes so that we can do polysynths
 - [x] Add a browser-based UI
 - [x] Add FFT/inverse FFT reactor to enable simple filtering
-- [x] There is something wrong with the sine oscillator. With poly0-synth it is all wierd. It is also veyr low in volume compared to tringale
+- [x] There is something wrong with the sine oscillator. With poly0-synth it is all weird. It is also very low in volume compared to a triangle
 - [x] Support program change MIDI commands
 - [ ] Support control change MIDI commands for ADSR amplitude envelope
 - [ ] Add a compressor, currently scaling down each lane if multiple lanes active
@@ -37,6 +37,9 @@ bin/Main
 - [ ] Interface an actual MIDI device
 - [ ] Stereo audio. (Currently, we are just doing MONO)
 
+## The frequency domain
+I am using KISSFFT to transform the audio signal into the frequency domain where
+we can implement interesting filters. 
 
 ## References:
 - [Syndig](https://github.com/mmitch/syndig) an excellent software synthesizer 

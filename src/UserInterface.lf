@@ -11,7 +11,7 @@ preamble {=
     #include "platform.h"
 =}
 
-reactor UserInterface(sample_size:int=128) {
+reactor UserInterface {
     input samples: sample_buffer_t*
     output midi_event:midi_base_msg_t;
 }
@@ -70,11 +70,26 @@ reactor FileInterface extends UserInterface {
         #include <fcntl.h>
         #include <unistd.h>
         #include "midi.h"
+        #define _GNU_SOURCE
+        #include <pthread.h>
+        #include <sched.h>
 
         bool stop = false;
 
         static void midi_reader_loop(int fd, void *action, midi_parser_t *parser) {
             char recv;
+            // Get the maximum priority for the given scheduling policy
+            // int maxPriority = sched_get_priority_max(SCHED_FIFO);
+
+            // // Set the scheduling policy and priority for the current thread
+            // struct sched_param param;
+            // param.sched_priority = maxPriority;
+
+            // if (pthread_setschedparam(pthread_self(), SCHED_FIFO, &param) != 0) {
+            //     perror("pthread_setschedparam");
+            //     // Handle the error
+            //     return -1;
+            // }
             while (!stop) {
                 // Read a MIDI message (3 bytes)
                 ssize_t bytes_read = read(fd, &recv, 1);
@@ -103,7 +118,13 @@ reactor FileInterface extends UserInterface {
             }
             while (!stop) {
                 // Open the MIDI device file
+                // FIXME: What is a reliable way of searching for any midi?
                 int fd = open("/dev/midi1", O_RDONLY);
+                if (fd > 0 ) {
+                    lf_print("Found MIDI device!");
+                    midi_reader_loop(fd, action, parser);
+                }
+                fd = open("/dev/midi2", O_RDONLY);
                 if (fd > 0 ) {
                     lf_print("Found MIDI device!");
                     midi_reader_loop(fd, action, parser);
