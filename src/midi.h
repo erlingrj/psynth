@@ -90,7 +90,7 @@ midi_parser_t *create_midi_parser();
 
 #define MIDI_NOTE_ON(x) {.status.channel=0, .status.type=NOTE_ON, .pitch=x, .velocity=60}
 #define MIDI_NOTE_OFF(x) {.status.channel=0, .status.type=NOTE_OFF, .pitch=x, .velocity=60}
-#define MIDI_PROGRAM_CHANGE(x){.status.channel=0, .status.type=PROGRAM_CHANGE, .program=x}
+#define MIDI_OSC_CHANGE(x){.status.channel=0, .status.type=CONTROL_CHANGE, .controller=SOUND_VARIATION, .value=(x << 5)}
 
 
 #define NOTE_CN1	0

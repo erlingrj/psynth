@@ -28,7 +28,6 @@ reactor Compressor {
 
       // Compress
       if (max > 1.0) {
-        lf_print("Compress maddafakka");
         for (int i = 0; i<SAMPLE_SIZE; i++) {
           samples_raw->value->samples[i] /= 4*max;
         }
