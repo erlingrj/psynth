@@ -21,8 +21,8 @@ main reactor {
   synth.samples -> out.samples
 
   // // // Printing and creating waveforms. Just for debug
-  tprint1 = new Print(filename="t1.csv", pg_name="t1.gp", only_last=true)
-  synth.samples -> tprint1.tsamples
+  // tprint1 = new Print(filename="t1.csv", pg_name="t1.gp", only_last=true)
+  // synth.samples -> tprint1.tsamples
   // tprint2 = new Print(filename="t2.csv", pg_name="t2.gp", only_last=false)
   // ifft.tsamples -> tprint2.tsamples
 }

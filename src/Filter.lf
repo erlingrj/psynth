@@ -32,7 +32,7 @@ reactor SimpleFilter extends FilterBase {
     if (ctrl->value.controller == TIMBRE) {
       double cutoff_freq = ctrl->value.value * nyquist / 127;
       self->cutoff_idx = (int)(cutoff_freq * SAMPLE_SIZE / nyquist);
-      lf_print("New cutoff-idx = %d", self->cutoff_idx);
+      // lf_print("New cutoff-idx = %d", self->cutoff_idx);
     }
   =}
 

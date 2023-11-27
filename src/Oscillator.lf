@@ -89,7 +89,6 @@ reactor Oscillator(initialType: osc_type_t = {=OSC_SINE=}) {
     lf_set_destructor(samples, sample_buffer_destructor);
     lf_set_copy_constructor(samples, sample_buffer_copy);
     self->sample_period = SEC(SAMPLE_SIZE)/SAMPLE_RATE;
-    lf_print("Sample period = %li", self->sample_period);
     lf_schedule(a,self->sample_period);
   =}
 

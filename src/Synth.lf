@@ -48,7 +48,7 @@ reactor Synth(n_lanes: int = 5) {
   reaction(midi_event) -> lanes.note_on, lanes.note_off, lanes.ctrl, filter.ctrl {=
     midi_base_msg_t * midi_msg = &midi_event->value;
 
-    print_midi(midi_msg);
+    // print_midi(midi_msg);
 
     // Some MIDI keyboards dont send NOTE_OFF only NOTE_ON with velocity=0
     if (midi_msg->status.type == NOTE_ON && 
@@ -76,7 +76,7 @@ reactor Synth(n_lanes: int = 5) {
           if (self->lane_playing[i] == -1) {
             memcpy(&lanes[i].note_on->value, midi_msg, sizeof(midi_note_on_t));
             lf_set_present(lanes[i].note_on);
-            lf_print("ON: Found note at lane %d", i);
+            // lf_print("ON: Found note at lane %d", i);
             self->lane_playing[i] = note_on->pitch;
             break;
           }

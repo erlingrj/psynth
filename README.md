@@ -12,7 +12,9 @@ goal of this project is to build a physical instrument.
 `curl -Ls https://install.lf-lang.org | bash -s cli`
 2. Install the pulsaudio libraries: 
 `sudo apt install libpulse-dev`
-3. Compile libkissfft:
+3. Pull down KISSFFT submodule:
+`git submodule update --init`
+4. Compile libkissfft:
 ```
 cd external/kissfft
 make KISSFFT_STATIC=1 all
@@ -22,6 +24,23 @@ make KISSFFT_STATIC=1 all
 lfc src/Main.lf
 bin/Main
 ```
+
+## Input
+The synth accepts MIDI commands and should work with a MIDI controller that is
+connected to the computer showing up as `/dev/midi1` or `/dev/midi2`. There is
+also a bad keyboard interface. Here you must press once to generate a NOTE_ON
+command and press again to generate a NOTE_OFF command. It turns out that it 
+is quite hard to detect key press and key release.
+
+## Debug the waveform
+There is a `Print` reactor that dumps the waveform to a CSV file and generates
+a gnuplot script. Just instantiate a Print reactor and connect it to a stream 
+of samples. After running the program do:
+```
+gnuplot *.gp
+```
+to run gnuplot which should generate a PDF with the waveform.
+
 
 ## Todo
 - [x] Add an amplitude envelope to avoid the ugly ticking audio

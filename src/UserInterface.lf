@@ -163,6 +163,15 @@ reactor CursesUserInterface extends UserInterface {
     reaction(startup) {=
         self->key_pressed = (bool *) malloc(NOTE_G9*sizeof(bool));
         self->key_pressed_next = (bool *) malloc(NOTE_G9*sizeof(bool));
+        lf_print("Welcom to the psynth.");
+        lf_print("Keyboard mapping:");
+        lf_print(" w e   t y u");
+        lf_print("a s d f g h j");
+        lf_print("One keypress for NOTE_ON, another for NOTE_OFF");
+        lf_print("Number=Move all tones UP number of half-tones");
+        lf_print("Shift+Number=Move all tones DOWN number of half-tones");
+        lf_print("c=change oscillator");
+        lf_print("q=turn off all notes");
     =}
 
     logical action killall;
@@ -256,7 +265,7 @@ reactor CursesUserInterface extends UserInterface {
                 lf_schedule_int(modulate, 0, -7);
                 break;
             default:
-                lf_print("Illegal character");
+                // lf_print("Illegal character");
                 return;
                 break;
         }
