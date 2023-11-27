@@ -16,8 +16,8 @@ goal of this project is to build a physical instrument.
 `git submodule update --init`
 4. Compile libkissfft:
 ```
-cd external/kissfft
-make KISSFFT_STATIC=1 all
+  cd external/kissfft
+  make KISSFFT_STATIC=1 all
 ```
 4. Compile and run
 ```
