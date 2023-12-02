@@ -18,7 +18,7 @@ reactor AmplitudeEnvelope {
 reactor ADSREnvelope(
   attack: time = 50 msec, 
   decay: time = 50 msec, 
-  sustain:float = 0.8,
+  sustain:SAMPLE_TYPE = 0.8,
   release:time = 40 msec) extends AmplitudeEnvelope 
 {
   input ctrl: midi_controller_change_t
@@ -79,7 +79,7 @@ reactor ADSREnvelope(
       instant_t now = lf_time_logical_elapsed();
       instant_t ts = now - self->attack_start;
 
-      float amp;
+      SAMPLE_TYPE amp;
       for (int i = 0; i<SAMPLE_SIZE; i++) {
         amp = (ts + SEC(i*SAMPLE_STEP)) * self->attack_rate;
         buffer->samples[i] = buffer->samples[i] * amp * self->velocity;
@@ -104,7 +104,7 @@ reactor ADSREnvelope(
 
       instant_t now = lf_time_logical_elapsed();
       instant_t ts  = now - self->decay_start;
-      float amp;
+      SAMPLE_TYPE amp;
 
       for (int i = 0; i<SAMPLE_SIZE; i++) {
         amp = self->amp_start - (ts + SEC(i*SAMPLE_STEP)) * self->decay_rate;
@@ -149,7 +149,7 @@ reactor ADSREnvelope(
       instant_t ts = now - self->release_start;
       bool done = false;
         for (int i = 0; i<SAMPLE_SIZE; i++) {
-          float amp = self->amp_start - (ts + SEC(i*SAMPLE_STEP)) * self->release_rate;
+          SAMPLE_TYPE amp = self->amp_start - (ts + SEC(i*SAMPLE_STEP)) * self->release_rate;
           if (amp <= 0) {
             amp = 0;
             done = true;
