@@ -2,7 +2,7 @@ target C
 
 import Oscillator from "Oscillator.lf"
 import ADSREnvelope from "Envelope.lf"
-import Compressor, Clipper from "Compressor.lf"
+import Compressor, Clipper, Scale from "Compressor.lf"
 import FFT, IFFT from "FFT.lf"
 import SimpleFilter from "Filter.lf"
 
@@ -26,6 +26,7 @@ reactor Synth(n_lanes: int = 5) {
   ifft = new IFFT()
   filter = new SimpleFilter()
   compressor = new Compressor()
+  scale = new Scale()
 
   lanes.samples -> merge.in
   // merge.out -> fft.tsamples
@@ -33,7 +34,8 @@ reactor Synth(n_lanes: int = 5) {
   // filter.out -> ifft.fsamples
   // ifft.tsamples -> samples
   merge.out -> compressor.samples_raw
-  compressor.samples -> samples
+  compressor.samples -> scale.samples_raw
+  scale.samples -> samples
 
 
   
@@ -160,6 +162,7 @@ reactor Merge(num_lanes:int=1) {
         n_present++;
       }
     }
+    lf_print("n_present=%d", n_present);
 
     sample_buffer_t * buffer = sample_buffer_ctor();
     for (int i=0; i<in_width; i++) {
