@@ -17,7 +17,7 @@ reactor Oscillator(initialType: osc_type_t = {=OSC_SINE=}) {
         samples[i] = sin(2*PI*phase*freq)*amplitude;
         phase += SAMPLE_STEP;
         if (phase >= period) {
-          phase = 0;
+          phase = (phase-period);
         }
       }
       return phase;
@@ -28,7 +28,7 @@ reactor Oscillator(initialType: osc_type_t = {=OSC_SINE=}) {
         samples[i] = (-1.0 + 2*phase*freq)*amplitude; 
         phase += SAMPLE_STEP;
         if (phase >= period) {
-            phase = 0;
+          phase = (phase-period);
         }
       }
       return phase;
@@ -43,7 +43,7 @@ reactor Oscillator(initialType: osc_type_t = {=OSC_SINE=}) {
         }
         phase += SAMPLE_STEP;
         if (phase >= period) {
-            phase = 0;
+          phase = (phase-period);
         }
       }
       return phase;
@@ -60,7 +60,7 @@ reactor Oscillator(initialType: osc_type_t = {=OSC_SINE=}) {
           samples[i] = (1.0 - 4*(phase - period/2)*freq)*amplitude; 
           phase += SAMPLE_STEP;
           if (phase >= period) {
-            phase = 0;
+            phase = (phase-period);
           }
         }
       }
@@ -122,6 +122,13 @@ reactor Oscillator(initialType: osc_type_t = {=OSC_SINE=}) {
           break;
       }
       lf_set(samples, buffer);
+    } else {
+      for (int i = 0; i<SAMPLE_SIZE; i++) {
+        self->phase += SAMPLE_STEP;
+        if (self->phase >= self->period) {
+          self->phase = self->phase-self->period;
+        }
+      }
     }
     lf_schedule(a, self->sample_period);
   =}
