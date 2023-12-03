@@ -5,6 +5,7 @@ import ADSREnvelope from "Envelope.lf"
 import Compressor, Clipper, Scale from "Compressor.lf"
 import FFT, IFFT from "FFT.lf"
 import SimpleFilter from "Filter.lf"
+import Print from "Print.lf"
 
 preamble {=
   #include "midi.h"
@@ -38,6 +39,15 @@ reactor Synth(n_lanes: int = 5) {
   scale.samples -> samples
 
 
+  // p1 = new Print(filename="p1.csv", pg_name="p1.gp", only_last=true)
+  // p2 = new Print(filename="p2.csv", pg_name="p2.gp", only_last=true)
+  // p3 = new Print(filename="p3.csv", pg_name="p3.gp", only_last=true)
+  // p4 = new Print(filename="p4.csv", pg_name="p4.gp", only_last=true)
+  // p5 = new Print(filename="p5.csv", pg_name="p5.gp", only_last=true)
+  // p6 = new Print(filename="p6.csv", pg_name="p6.gp", only_last=true)
+  
+  // lanes.samples -> p1.tsamples, p2.tsamples, p3.tsamples, p4.tsamples, p5.tsamples
+  // merge.out -> p6.tsamples
   
 
   reaction(startup) {=
@@ -162,7 +172,7 @@ reactor Merge(num_lanes:int=1) {
         n_present++;
       }
     }
-    lf_print("n_present=%d", n_present);
+    // lf_print("n_present=%d", n_present);
 
     sample_buffer_t * buffer = sample_buffer_ctor();
     for (int i=0; i<in_width; i++) {

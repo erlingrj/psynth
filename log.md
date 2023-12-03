@@ -1,3 +1,11 @@
+# Dec 3
+- I have fixed errors in: ADSR, Compressor and Oscillator and most of the long-standing problems are gone.
+- One issue left. When I hit multple keys it still has glitching. I have tried the following:
+1. Max thread priority for the threads
+2. Buffer up lots of data in sound output and JUST outputting it directly
+None had any impact. This leads me to believe that the error is in the samples that I have generated. I must closely
+look at my oscillator implementation etc to see if I can spot the error
+
 # Nov 26
 - I found that increasing the priority of my threads does improve the functioning of this program.
 - Found another race condition in the token-handling logic...

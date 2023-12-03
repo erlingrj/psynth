@@ -25,9 +25,7 @@ reactor SoundOutput {
     =}
     
     reaction(samples) {= 
+        lf_print("Output delay=%lli", lf_time_physical() - lf_time_logical());
         pa_simple_write(self->s, samples->value->samples, SAMPLE_NUM_BYTES, NULL);
-        #if defined(NDEBUG)
-            lf_print_error_and_exit("NDEBUG defined");
-        #endif
     =}
 }
