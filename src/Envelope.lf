@@ -78,11 +78,11 @@ reactor ADSREnvelope(
         amp = (ts + SEC(i*SAMPLE_STEP)) * self->attack_rate;
         buffer->samples[i] = buffer->samples[i] * amp * self->velocity;
       }
+      self->amp_start = amp;
       lf_set_token(samples, samples_raw->token);
 
       if (now >= self->decay_start) {
         lf_set_mode(Decay);
-        self->amp_start = amp;
       }
     =}
 
@@ -105,18 +105,16 @@ reactor ADSREnvelope(
         buffer->samples[i] = buffer->samples[i] * amp * self->velocity;
       }
       lf_set_token(samples, samples_raw->token);
+      self->amp_start = amp;
 
       if (now >= self->sustain_start || amp <= self->sustain) {
-        self->amp_start = amp;
         lf_set_mode(Sustain);
-        // lf_print("Sustain");
       }
     =}
 
     reaction(note_off) -> reset(Release) {=
       lf_set_mode(Release);
       self->release_start = lf_time_logical_elapsed();
-        // lf_print("Release");
     =}
   }
 
@@ -132,7 +130,6 @@ reactor ADSREnvelope(
     reaction(note_off) -> reset(Release) {=
       lf_set_mode(Release);
       self->release_start = lf_time_logical_elapsed();
-        // lf_print("Release");
     =}
   }
 
