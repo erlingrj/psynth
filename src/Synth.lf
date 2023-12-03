@@ -36,7 +36,7 @@ reactor Synth(n_lanes: int = 5) {
   reaction(midi_event) -> lanes.note_on, lanes.note_off, lanes.ctrl, filter.ctrl {=
     midi_base_msg_t * midi_msg = &midi_event->value;
 
-    print_midi(midi_msg);
+    // print_midi(midi_msg);
 
     // Some MIDI keyboards dont send NOTE_OFF only NOTE_ON with velocity=0
     if (midi_msg->status.type == NOTE_ON &&
