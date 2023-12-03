@@ -1,17 +1,14 @@
-target C;
-
+target C
 
 preamble {=
-    #include "midi.h"
-    #include "freq.h"
-    #include "common.h"
-    #include "buffer.h"
-    #include <math.h>
-    #include <string.h>
+  #include "psynth.h"
 =}
 
-reactor Oscillator(initialType: osc_type_t = {=OSC_SINE=}) {
+reactor Oscillator(initialType: osc_type_t = {= OSC_SINE =}) {
   preamble {=
+    #define SQUARE_SCALE_FACTOR 0.2
+    #define SAW_SCALE_FACTOR 0.4
+
     double osc_sine(float *samples, double amplitude, double phase, double freq, double period) {
       for (int i = 0; i<SAMPLE_SIZE; i++) {
         samples[i] = sin(2*PI*phase*freq)*amplitude;
@@ -25,7 +22,7 @@ reactor Oscillator(initialType: osc_type_t = {=OSC_SINE=}) {
 
     double osc_saw(float *samples, double amplitude, double phase, double freq, double period) {
       for (int i = 0; i<SAMPLE_SIZE; i++) {
-        samples[i] = (-1.0 + 2*phase*freq)*amplitude; 
+        samples[i] = (-1.0 + 2*phase*freq)*amplitude*SAW_SCALE_FACTOR;
         phase += SAMPLE_STEP;
         if (phase >= period) {
           phase = (phase-period);
@@ -37,9 +34,9 @@ reactor Oscillator(initialType: osc_type_t = {=OSC_SINE=}) {
     double osc_square(float *samples, double amplitude, double phase, double freq, double period) {
       for (int i = 0; i<SAMPLE_SIZE; i++) {
         if (phase < period/2) {
-          samples[i] = -amplitude;
+          samples[i] = -amplitude*SQUARE_SCALE_FACTOR;
         } else {
-          samples[i] = amplitude;
+          samples[i] = amplitude*SQUARE_SCALE_FACTOR;
         }
         phase += SAMPLE_STEP;
         if (phase >= period) {
@@ -54,10 +51,10 @@ reactor Oscillator(initialType: osc_type_t = {=OSC_SINE=}) {
         bool rising = phase < period/2;
 
         if (rising) {
-          samples[i] = (-1.0 + 4*phase*freq) * amplitude; 
+          samples[i] = (-1.0 + 4*phase*freq) * amplitude;
           phase += SAMPLE_STEP;
         } else {
-          samples[i] = (1.0 - 4*(phase - period/2)*freq)*amplitude; 
+          samples[i] = (1.0 - 4*(phase - period/2)*freq)*amplitude;
           phase += SAMPLE_STEP;
           if (phase >= period) {
             phase = (phase-period);
@@ -68,20 +65,20 @@ reactor Oscillator(initialType: osc_type_t = {=OSC_SINE=}) {
     }
   =}
 
-  input freq:double
+  input freq: double
   output samples: sample_buffer_t*
   input type: osc_type_t
-  input dead:bool
+  input dead: bool
 
   state phase: double = 0
   state freq: double = 0
   state period: double = 0
   state amplitude: double = 1
   state type: osc_type_t = initialType
-  state on:bool = false;
-  
-  state sample_period: interval_t 
-  state sample_step:double
+  state on: bool = false
+
+  state sample_period: interval_t
+  state sample_step: double
 
   logical action a
 
@@ -99,40 +96,32 @@ reactor Oscillator(initialType: osc_type_t = {=OSC_SINE=}) {
     self->on = true;
   =}
 
-
   reaction(type) {=
     self->type = type->value;
   =}
-  
-  reaction(a) -> samples,a {=
+
+  reaction(a) -> samples, a {=
     if (self->on) {
       sample_buffer_t * buffer = sample_buffer_ctor();
       switch (self->type) {
-        case OSC_SINE: 
+        case OSC_SINE:
           self->phase = osc_sine(buffer->samples, self->amplitude, self->phase, self->freq, self->period);
           break;
-        case OSC_SQUARE: 
+        case OSC_SQUARE:
           self->phase = osc_square(buffer->samples, self->amplitude, self->phase, self->freq, self->period);
           break;
-        case OSC_SAW: 
+        case OSC_SAW:
           self->phase = osc_saw(buffer->samples, self->amplitude, self->phase, self->freq, self->period);
           break;
-        case OSC_TRI: 
+        case OSC_TRI:
           self->phase = osc_tri(buffer->samples, self->amplitude, self->phase, self->freq, self->period);
           break;
       }
       lf_set(samples, buffer);
-    } else {
-      for (int i = 0; i<SAMPLE_SIZE; i++) {
-        self->phase += SAMPLE_STEP;
-        if (self->phase >= self->period) {
-          self->phase = self->phase-self->period;
-        }
-      }
     }
     lf_schedule(a, self->sample_period);
   =}
-  
+
   reaction(dead) {=
     self->on = false;
   =}

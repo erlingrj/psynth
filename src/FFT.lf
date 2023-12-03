@@ -1,15 +1,14 @@
 target C
 
 preamble {=
-  #include "common.h"
-  #include "buffer.h"
+  #include "psynth.h"
 =}
 
 reactor FFT {
   input tsamples: sample_buffer_t*
   output fsamples: fsample_buffer_t*
 
-  state cfg:kiss_fft_cfg
+  state cfg: kiss_fft_cfg
 
   reaction(startup) -> fsamples {=
     self->cfg = kiss_fft_alloc(SAMPLE_SIZE,0, NULL,NULL);
@@ -34,7 +33,7 @@ reactor FFT {
 reactor IFFT {
   output tsamples: sample_buffer_t*
   input fsamples: fsample_buffer_t*
-  state cfg:kiss_fft_cfg
+  state cfg: kiss_fft_cfg
 
   reaction(startup) -> tsamples {=
     self->cfg = kiss_fft_alloc(SAMPLE_SIZE,1, NULL,NULL);

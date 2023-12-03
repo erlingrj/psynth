@@ -1,18 +1,11 @@
 target C
 
-import Oscillator from "Oscillator.lf"
-import ADSREnvelope from "Envelope.lf"
-import Compressor, Clipper, Scale from "Compressor.lf"
 import FFT, IFFT from "FFT.lf"
 import SimpleFilter from "Filter.lf"
-import Print from "Print.lf"
+import Merge, Lane from "Lane.lf"
 
 preamble {=
-  #include "midi.h"
-  #include "freq.h"
-  #include "common.h"
-  #include "buffer.h"
-  #include <string.h>
+  #include "psynth.h"
 =}
 
 reactor Synth(n_lanes: int = 5) {
@@ -22,48 +15,31 @@ reactor Synth(n_lanes: int = 5) {
 
   lanes = new[n_lanes] Lane()
   merge = new Merge(num_lanes=n_lanes)
-  
+
   fft = new FFT()
   ifft = new IFFT()
   filter = new SimpleFilter()
-  compressor = new Compressor()
-  scale = new Scale()
 
   lanes.samples -> merge.in
-  // merge.out -> fft.tsamples
-  // fft.fsamples -> filter.in
-  // filter.out -> ifft.fsamples
-  // ifft.tsamples -> samples
-  merge.out -> compressor.samples_raw
-  compressor.samples -> scale.samples_raw
-  scale.samples -> samples
-
-
-  // p1 = new Print(filename="p1.csv", pg_name="p1.gp", only_last=true)
-  // p2 = new Print(filename="p2.csv", pg_name="p2.gp", only_last=true)
-  // p3 = new Print(filename="p3.csv", pg_name="p3.gp", only_last=true)
-  // p4 = new Print(filename="p4.csv", pg_name="p4.gp", only_last=true)
-  // p5 = new Print(filename="p5.csv", pg_name="p5.gp", only_last=true)
-  // p6 = new Print(filename="p6.csv", pg_name="p6.gp", only_last=true)
-  
-  // lanes.samples -> p1.tsamples, p2.tsamples, p3.tsamples, p4.tsamples, p5.tsamples
-  // merge.out -> p6.tsamples
-  
+  merge.out -> fft.tsamples
+  fft.fsamples -> filter.in
+  filter.out -> ifft.fsamples
+  ifft.tsamples -> samples
 
   reaction(startup) {=
     self->lane_playing = (int *) malloc(self->n_lanes * sizeof(int));
     for (int i = 0; i<self->n_lanes; i++) {
-        self->lane_playing[i] = -1;
+        self->lane_playing[i] = LANE_IDLE;
     }
   =}
 
   reaction(midi_event) -> lanes.note_on, lanes.note_off, lanes.ctrl, filter.ctrl {=
     midi_base_msg_t * midi_msg = &midi_event->value;
 
-    // print_midi(midi_msg);
+    print_midi(midi_msg);
 
     // Some MIDI keyboards dont send NOTE_OFF only NOTE_ON with velocity=0
-    if (midi_msg->status.type == NOTE_ON && 
+    if (midi_msg->status.type == NOTE_ON &&
         ((midi_note_on_t *) midi_msg)->velocity==0) {
         midi_msg->status.type = NOTE_OFF;
     }
@@ -75,8 +51,8 @@ reactor Synth(n_lanes: int = 5) {
           if (self->lane_playing[i] == note_off->pitch) {
             memcpy(&lanes[i].note_off->value, midi_msg, sizeof(midi_note_off_t));
             lf_set_present(lanes[i].note_off);
+            self->lane_playing[i] = LANE_RELEASING;
             // lf_print("OFF: Found note at lane %d", i);
-            self->lane_playing[i] = -1;
             break;
           }
         }
@@ -85,7 +61,7 @@ reactor Synth(n_lanes: int = 5) {
       case NOTE_ON: {
         midi_note_on_t * note_on = (midi_note_on_t *) midi_msg;
         for (int i = 0; i<self->n_lanes; i++) {
-          if (self->lane_playing[i] == -1) {
+          if (self->lane_playing[i] == LANE_IDLE) {
             memcpy(&lanes[i].note_on->value, midi_msg, sizeof(midi_note_on_t));
             lf_set_present(lanes[i].note_on);
             // lf_print("ON: Found note at lane %d", i);
@@ -99,89 +75,32 @@ reactor Synth(n_lanes: int = 5) {
       case CONTROL_CHANGE: {
         midi_controller_change_t * program = (midi_controller_change_t *) midi_msg;
         switch(program->controller) {
-          case SOUND_VARIATION:
-          case RELEASE_TIME:
-          case ATTACK_TIME: {
+          case OSCILLATOR:
+          case OSCILLATOR_MOD:
+          case AMP_ENVELOPE: {
             for (int i = 0; i<self->n_lanes; i++) {
               memcpy(&lanes[i].ctrl->value, program, sizeof(midi_controller_change_t));
               lf_set_present(lanes[i].ctrl);
             }
             break;
           }
-          case TIMBRE:
+          case FILTER_ENVELOPE:
+          case FILTER_FREQ:
+          case MASTER_FILTER:
             memcpy(&filter.ctrl->value, program, sizeof(midi_controller_change_t));
             lf_set_present(filter.ctrl);
             break;
-
         }
       }
     }
   =}
-}
 
-reactor Lane(bank_index: int = 0) {
-  input note_on: midi_note_on_t
-  input note_off: midi_note_off_t
-  input ctrl: midi_controller_change_t
-  output samples: sample_buffer_t*
-
-  osc = new Oscillator(initialType = {= OSC_SINE =})
-  env = new ADSREnvelope()
-
-  reaction(note_on) -> env.note_on, env.velocity, osc.freq {=
-    lf_set(env.note_on, true);
-    lf_set(env.velocity, note_on->value.velocity);
-    lf_set(osc.freq, freqs[note_on->value.pitch]);
-  =}
-
-  reaction(note_off) -> env.note_off {=
-    lf_set(env.note_off, true);
-  =}
-
-  reaction(ctrl) -> osc.type, env.ctrl {=
-    if (ctrl->value.controller == SOUND_VARIATION) {
-      osc_type_t osc_type = ctrl->value.value >> 5;
-      if(osc_type > 3) {
-        lf_print_error_and_exit("Error in oscillator type calculation");
-      }
-      lf_set(osc.type, osc_type);
-    } else {
-      memcpy(&env.ctrl->value, &ctrl->value, sizeof(midi_controller_change_t));
-      lf_set_present(env.ctrl);
-    }
-  =}
-
-  osc.samples -> env.samples_raw
-  env.samples -> samples
-  env.dead -> osc.dead
-}
-
-reactor Merge(num_lanes:int=1) {
-  input [num_lanes] in:sample_buffer_t*
-  output out:sample_buffer_t*
-
-  reaction(startup) -> out {=
-    lf_set_destructor(out, sample_buffer_destructor);
-    lf_set_copy_constructor(out, sample_buffer_copy);
-  =}
-
-  reaction(in) -> out {=
-    int n_present = 0;
-    for (int i = 0; i<in_width; i++) {
-      if (in[i]->is_present) {
-        n_present++;
+  reaction(lanes.dead) {=
+    for (int i = 0; i<self->n_lanes; i++) {
+      if (lanes[i].dead->is_present) {
+        // lf_print("DEAD lane %d", i);
+        self->lane_playing[i] = LANE_IDLE;
       }
     }
-    // lf_print("n_present=%d", n_present);
-
-    sample_buffer_t * buffer = sample_buffer_ctor();
-    for (int i=0; i<in_width; i++) {
-      if (in[i]->is_present) {
-        for (int j=0; j<SAMPLE_SIZE; j++) {
-          buffer->samples[j] += in[i]->value->samples[j];
-        }
-      }
-    }
-    lf_set(out, buffer);
   =}
 }

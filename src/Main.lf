@@ -1,28 +1,38 @@
 target C {
-    files: ["midi.c", "freq.c","midi.h","common.h", "freq.h", "buffer.c", "buffer.h","../external/kissfft/kiss_fft.h", "../external/kissfft/libkissfft-float.a"],
-    cmake-include: "include.cmake",
-    build-type: Debug,
-    // timeout: 10s
-    // fast: true,
-    // tracing: true,
+  files: [
+      "lib/psynth.h",
+      "lib/midi.c",
+      "lib/freq.c",
+      "lib/midi.h",
+      "lib/common.h",
+      "lib/freq.h",
+      "lib/buffer.c",
+      "lib/buffer.h",
+      "../external/kissfft/kiss_fft.h",
+      "../external/kissfft/libkissfft-float.a"],
+  cmake-include: "lib/psynth.cmake",
+  workers: 4,
+  keepalive: true
 }
 
 import SoundOutput from "SoundOutput.lf"
 import Synth from "Synth.lf"
-import CursesUserInterface as UserInterface from "UserInterface.lf"
+import FileInterface as UserInterface from "UserInterface.lf"
 import Print from "Print.lf"
-import OscillatorChangeSequence from "Sequence.lf"
+
+preamble {=
+  #include "psynth.h"
+=}
 
 main reactor {
   synth = new Synth()
   out = new SoundOutput()
   ui = new UserInterface()
   ui.midi_event -> synth.midi_event
-  synth.samples -> out.samples
-
-  // // // Printing and creating waveforms. Just for debug
+  // // Printing and creating waveforms. Just for debug
   // tprint1 = new Print(filename="t1.csv", pg_name="t1.gp", only_last=true)
   // synth.samples -> tprint1.tsamples
   // tprint2 = new Print(filename="t2.csv", pg_name="t2.gp", only_last=false)
   // ifft.tsamples -> tprint2.tsamples
+  synth.samples -> out.samples
 }

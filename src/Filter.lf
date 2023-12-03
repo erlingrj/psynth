@@ -1,22 +1,17 @@
-target C;
+target C
 
 preamble {=
-  #include "midi.h"
-  #include "freq.h"
-  #include "common.h"
-  #include "buffer.h"
-  #include <string.h>
+  #include "psynth.h"
 =}
 
 reactor FilterBase {
   mutable input in: fsample_buffer_t*
   output out: fsample_buffer_t*
-  input ctrl: midi_controller_change_t;
+  input ctrl: midi_controller_change_t
 }
 
 reactor SimpleFilter extends FilterBase {
-
-  state omegaC: double = 0;
+  state omegaC: double = 0
   state alpha: double = 0
   state beta: double = 0
 
@@ -26,13 +21,23 @@ reactor SimpleFilter extends FilterBase {
     // Calculate filter coefficients
     self->cutoff_idx = SAMPLE_SIZE-1;
   =}
-  
+
   reaction(ctrl) {=
-    int nyquist = SAMPLE_RATE/2;
-    if (ctrl->value.controller == TIMBRE) {
-      double cutoff_freq = ctrl->value.value * nyquist / 127;
-      self->cutoff_idx = (int)(cutoff_freq * SAMPLE_SIZE / nyquist);
-      // lf_print("New cutoff-idx = %d", self->cutoff_idx);
+    switch(ctrl->value.controller) {
+      case FILTER_ENVELOPE:
+        break;
+      case FILTER_FREQ: {
+        int nyquist = SAMPLE_RATE/2;
+        double cutoff_freq = ctrl->value.value * nyquist / 127;
+        self->cutoff_idx = (int)(cutoff_freq * SAMPLE_SIZE / nyquist);
+        break;
+      }
+      case MASTER_FILTER: {
+        int nyquist = SAMPLE_RATE/2;
+        double cutoff_freq = ctrl->value.value * nyquist / 127;
+        self->cutoff_idx = (int)(cutoff_freq * SAMPLE_SIZE / nyquist);
+        break;
+      }
     }
   =}
 

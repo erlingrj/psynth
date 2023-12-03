@@ -1,9 +1,7 @@
-target C;
+target C
 
 preamble {=
-  #include "common.h"
-  #include "buffer.h"
-  #include "midi.h"
+  #include "psynth.h"
 =}
 
 reactor AmplitudeEnvelope {
@@ -16,14 +14,13 @@ reactor AmplitudeEnvelope {
 // An amplitude envelope with 4 parameters. Uses modal reactors to
 // jump between the 4 states.
 reactor ADSREnvelope(
-  attack: time = 50 msec, 
-  decay: time = 50 msec, 
-  sustain:SAMPLE_TYPE = 0.8,
-  release:time = 40 msec) extends AmplitudeEnvelope 
-{
+    attack: time = 50 msec,
+    decay: time = 50 msec,
+    sustain: SAMPLE_TYPE = 0.8,
+    release: time = 40 msec) extends AmplitudeEnvelope {
   input ctrl: midi_controller_change_t
   input velocity: double
-  output dead:bool
+  output dead: bool
   state attack_rate: double
   state decay_rate: double
   state release_rate: double
@@ -35,34 +32,31 @@ reactor ADSREnvelope(
   state sustain_start: time
 
   state amp_start: double = 0
-  
+
   reaction(ctrl) {=
     switch (ctrl->value.controller) {
-      case RELEASE_TIME: {
-        self->release = SEC(2) * ctrl->value.value/127;  
+      case AMP_ENVELOPE: {
+        if (ctrl->value.value == 0) ctrl->value.value++;
+        self->release = SEC(1) * ctrl->value.value/127;
         self->release_rate = self->sustain/self->release;
-        break;
-      }
-      case ATTACK_TIME: {
-        self->attack = SEC(2) * ctrl->value.value/127;  
+        self->attack = SEC(1) * ctrl->value.value/127;
         self->attack_rate = 1.0/self->attack;
         break;
-
       }
     }
   =}
 
   reaction(startup) -> samples {=
-    self->attack_rate = 1.0/self->attack;  
-    self->decay_rate= (1.0 - self->sustain)/self->decay;  
-    self->release_rate = self->sustain/self->release;  
+    self->attack_rate = 1.0/self->attack;
+    self->decay_rate= (1.0 - self->sustain)/self->decay;
+    self->release_rate = self->sustain/self->release;
 
     lf_set_destructor(samples, sample_buffer_destructor);
     lf_set_copy_constructor(samples, sample_buffer_copy);
   =}
 
   initial mode Idle {
-    reaction(note_on) velocity -> Attack {=
+    reaction(note_on) velocity -> reset(Attack) {=
       // lf_print("Attack");
       self->attack_start = lf_time_logical_elapsed();
       self->decay_start = self->attack_start + self->attack;
@@ -74,7 +68,7 @@ reactor ADSREnvelope(
   }
 
   mode Attack {
-    reaction(samples_raw) -> samples, Decay {=
+    reaction(samples_raw) -> samples, reset(Decay) {=
       sample_buffer_t *buffer = samples_raw->value;
       instant_t now = lf_time_logical_elapsed();
       instant_t ts = now - self->attack_start;
@@ -92,14 +86,14 @@ reactor ADSREnvelope(
       }
     =}
 
-    reaction(note_off) -> Release {=
+    reaction(note_off) -> reset(Release) {=
       self->release_start = lf_time_logical_elapsed();
       lf_set_mode(Release);
     =}
   }
 
   mode Decay {
-    reaction(samples_raw) -> samples, Sustain {=
+    reaction(samples_raw) -> samples, reset(Sustain) {=
       sample_buffer_t *buffer = samples_raw->value;
 
       instant_t now = lf_time_logical_elapsed();
@@ -119,7 +113,7 @@ reactor ADSREnvelope(
       }
     =}
 
-    reaction(note_off) -> Release {=
+    reaction(note_off) -> reset(Release) {=
       lf_set_mode(Release);
       self->release_start = lf_time_logical_elapsed();
         // lf_print("Release");
@@ -135,7 +129,7 @@ reactor ADSREnvelope(
       lf_set_token(samples, samples_raw->token);
     =}
 
-    reaction(note_off) -> Release {=
+    reaction(note_off) -> reset(Release) {=
       lf_set_mode(Release);
       self->release_start = lf_time_logical_elapsed();
         // lf_print("Release");
@@ -143,7 +137,7 @@ reactor ADSREnvelope(
   }
 
   mode Release {
-    reaction(samples_raw) -> samples, Idle, dead {=
+    reaction(samples_raw) -> samples, reset(Idle), dead {=
       sample_buffer_t * buffer = samples_raw->value;
       instant_t now = lf_time_logical_elapsed();
       instant_t ts = now - self->release_start;
@@ -160,12 +154,12 @@ reactor ADSREnvelope(
         lf_set(dead, true);
         lf_set_mode(Idle);
       }
-      
+
       lf_set_token(samples, samples_raw->token);
     =}
 
-    reaction(note_on) -> Attack {=
-      lf_print_error("Should not receive note_on in Release mode.");
+    reaction(note_on) {=
+      lf_print_error_and_exit("Should not receive note_on in release mode");
     =}
   }
 }

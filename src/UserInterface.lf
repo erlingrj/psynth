@@ -1,331 +1,334 @@
-target C;
+target C
 
 import WebSocketServer from "lib/WebSocketServer.lf"
 import KeyboardInput from "lib/Keyboard.lf"
 
-preamble {= 
-    #include <stdio.h>
-    #include "common.h"
-    #include "buffer.h"
-    #include "midi.h"
-    #include "platform.h"
+preamble {=
+  #include "psynth.h"
 =}
 
 reactor UserInterface {
-    input samples: sample_buffer_t*
-    output midi_event:midi_base_msg_t;
+  preamble {=
+    #include "platform.h"
+            #include <stdio.h>
+  =}
+  input samples: sample_buffer_t*
+  output midi_event: midi_base_msg_t
 }
 
 reactor WebSocketUserInterface extends UserInterface {
-    sock = new WebSocketServer(max_clients=1)
-    state wsi: void* = 0 
+  sock = new WebSocketServer(max_clients=1)
+  state wsi: void* = 0
 
-    state buffer: SAMPLE_TYPE*
-    state idx: int = 0;
+  state buffer: SAMPLE_TYPE*
+  state idx: int = 0
 
-    reaction(startup) {=
-        self->buffer = (SAMPLE_TYPE *) malloc(SAMPLE_NUM_BYTES);
-    =}
-    
-    reaction(sock.received) -> midi_event {=
-        lf_print("Got MIDI from browser %s", sock.received->value->message);
-    =}
+  reaction(startup) {=
+    self->buffer = (SAMPLE_TYPE *) malloc(SAMPLE_NUM_BYTES);
+  =}
 
-    reaction(samples) -> sock.send {=
-        if (self->wsi) {
-            for (int i = 0; i<SAMPLE_SIZE; i=i+16) {
-                self->buffer[self->idx++] = samples->value->samples[i];
-            }
-            if (self->idx == SAMPLE_SIZE) {
-                char* message; web_socket_message_t* container = (web_socket_message_t*)malloc(sizeof(web_socket_message_t));
-                container->message = (char *) self->buffer;
-                container->length = SAMPLE_NUM_BYTES;
-                container->wsi = self->wsi;
-                lf_set(sock.send, container);
-                self->idx = 0;
-            }
+  reaction(sock.received) -> midi_event {=
+    lf_print("Got MIDI from browser %s", sock.received->value->message);
+  =}
+
+  reaction(samples) -> sock.send {=
+    if (self->wsi) {
+        for (int i = 0; i<SAMPLE_SIZE; i=i+16) {
+            self->buffer[self->idx++] = samples->value->samples[i];
         }
-    =}
-
-
-
-
-
-    reaction(sock.connected) {=
-        if(sock.connected->value.connected) {
-            lf_print("New client connected to our web socket");
-            self->wsi = sock.connected->value.wsi;
-        } else {
-            lf_print("Client disconnected from our web socket");
-            self->wsi = 0;
+        if (self->idx == SAMPLE_SIZE) {
+            char* message; web_socket_message_t* container = (web_socket_message_t*)malloc(sizeof(web_socket_message_t));
+            container->message = (char *) self->buffer;
+            container->length = SAMPLE_NUM_BYTES;
+            container->wsi = self->wsi;
+            lf_set(sock.send, container);
+            self->idx = 0;
         }
-    =}
+    }
+  =}
+
+  reaction(sock.connected) {=
+    if(sock.connected->value.connected) {
+        lf_print("New client connected to our web socket");
+        self->wsi = sock.connected->value.wsi;
+    } else {
+        lf_print("Client disconnected from our web socket");
+        self->wsi = 0;
+    }
+  =}
 }
 
-
 reactor FileInterface extends UserInterface {
-    preamble {=
-        #include <stdio.h>
-        #include <stdlib.h>
-        #include <fcntl.h>
-        #include <unistd.h>
-        #include "midi.h"
-        #define _GNU_SOURCE
-        #include <pthread.h>
-        #include <sched.h>
+  preamble {=
+    #include <stdio.h>
+    #include <stdlib.h>
+    #include <fcntl.h>
+    #include <unistd.h>
+    #include "midi.h"
+    #define _GNU_SOURCE
+    #include <pthread.h>
+    #include <sched.h>
 
-        bool stop = false;
+    bool stop = false;
 
-        static void midi_reader_loop(int fd, void *action, midi_parser_t *parser) {
-            char recv;
-            // Get the maximum priority for the given scheduling policy
-            // int maxPriority = sched_get_priority_max(SCHED_FIFO);
+    static void midi_reader_loop(int fd, void *action, midi_parser_t *parser) {
+        char recv;
+        // Get the maximum priority for the given scheduling policy
+        // int maxPriority = sched_get_priority_max(SCHED_FIFO);
 
-            // // Set the scheduling policy and priority for the current thread
-            // struct sched_param param;
-            // param.sched_priority = maxPriority;
+        // // Set the scheduling policy and priority for the current thread
+        // struct sched_param param;
+        // param.sched_priority = maxPriority;
 
-            // if (pthread_setschedparam(pthread_self(), SCHED_FIFO, &param) != 0) {
-            //     perror("pthread_setschedparam");
-            //     // Handle the error
-            //     return -1;
-            // }
-            while (!stop) {
-                // Read a MIDI message (3 bytes)
-                ssize_t bytes_read = read(fd, &recv, 1);
-                // Check for errors or end-of-file
-                if (bytes_read < 0) {
-                    lf_print("Error reading from MIDI device");
-                    return;
-                } else if (bytes_read == 0) {
-                    lf_print("Error reading from MIDI device");
-                    return;
-                }
-                // printf("%02x \n", (unsigned char) recv);
-                if (midi_parser(parser, recv)) {
-                    // printf("FOUND MIDI MSG\n");
-                    lf_schedule_copy(action, 0, &parser->msg, 1);
-                    memset(&parser->msg, 0, sizeof(parser->msg));
-                }
+        // if (pthread_setschedparam(pthread_self(), SCHED_FIFO, &param) != 0) {
+        //     perror("pthread_setschedparam");
+        //     // Handle the error
+        //     return -1;
+        // }
+        while (!stop) {
+            // Read a MIDI message (3 bytes)
+            ssize_t bytes_read = read(fd, &recv, 1);
+            // Check for errors or end-of-file
+            if (bytes_read < 0) {
+                lf_print("Error reading from MIDI device");
+                return;
+            } else if (bytes_read == 0) {
+                lf_print("Error reading from MIDI device");
+                return;
             }
-            close(fd);
-        }
-
-        void* midi_reader_worker(void *action) {
-            midi_parser_t *parser = create_midi_parser();
-            if (!parser) {
-                lf_print_error_and_exit("Could not create midi parser");
-            }
-            while (!stop) {
-                // Open the MIDI device file
-                // FIXME: What is a reliable way of searching for any midi?
-                int fd = open("/dev/midi1", O_RDONLY);
-                if (fd > 0 ) {
-                    lf_print("Found MIDI device!");
-                    midi_reader_loop(fd, action, parser);
-                }
-                fd = open("/dev/midi2", O_RDONLY);
-                if (fd > 0 ) {
-                    lf_print("Found MIDI device!");
-                    midi_reader_loop(fd, action, parser);
-                }
+            // printf("%02x \n", (unsigned char) recv);
+            if (midi_parser(parser, recv)) {
+                // printf("FOUND MIDI MSG\n");
+                lf_schedule_copy(action, 0, &parser->msg, 1);
+                memset(&parser->msg, 0, sizeof(parser->msg));
             }
         }
-        
-    =}
+        close(fd);
+    }
 
-    state thread: lf_thread_t
-    physical action a: midi_base_msg_t
+    void* midi_reader_worker(void *action) {
+        midi_parser_t *parser = create_midi_parser();
+        if (!parser) {
+            lf_print_error_and_exit("Could not create midi parser");
+        }
+        while (!stop) {
+            // Open the MIDI device file
+            // FIXME: What is a reliable way of searching for any midi?
+            int fd = open("/dev/midi1", O_RDONLY);
+            if (fd > 0 ) {
+                lf_print("Found MIDI device!");
+                midi_reader_loop(fd, action, parser);
+            }
+            fd = open("/dev/midi2", O_RDONLY);
+            if (fd > 0 ) {
+                lf_print("Found MIDI device!");
+                midi_reader_loop(fd, action, parser);
+            }
+            fd = open("/dev/midi3", O_RDONLY);
+            if (fd > 0 ) {
+                lf_print("Found MIDI device!");
+                midi_reader_loop(fd, action, parser);
+            }
+            lf_sleep(SEC(1));
+        }
+    }
+  =}
 
-    reaction(startup) -> a {=
-        // Start the thread that is blocking on reading input
-        lf_thread_create(&self->thread, &midi_reader_worker, a);
-    =}
+  state thread: lf_thread_t
+  physical action a: midi_base_msg_t
 
-    reaction(a) -> midi_event {=
-        memcpy(&midi_event->value, &a->value, sizeof(midi_base_msg_t));
-        lf_set_present(midi_event);
-    =}
+  reaction(startup) -> a {=
+    // Start the thread that is blocking on reading input
+    lf_thread_create(&self->thread, &midi_reader_worker, a);
+  =}
 
-    reaction(shutdown) {=
-        void* thread_exit_status;
-        stop=true;
-        lf_thread_join(self->thread, &thread_exit_status);
-    =}
+  reaction(a) -> midi_event {=
+    memcpy(&midi_event->value, &a->value, sizeof(midi_base_msg_t));
+    lf_set_present(midi_event);
+  =}
+
+  reaction(shutdown) {=
+    void* thread_exit_status;
+    stop=true;
+    lf_thread_join(self->thread, &thread_exit_status);
+  =}
 }
 
 reactor CursesUserInterface extends UserInterface {
-    keyboard = new KeyboardInput()
-    state key_pressed_next:bool*
-    state key_pressed:bool*;
-    state octave:int = {=NOTE_C4=};
-    state program:int = 0;
-    reaction(startup) {=
-        self->key_pressed = (bool *) malloc(NOTE_G9*sizeof(bool));
-        self->key_pressed_next = (bool *) malloc(NOTE_G9*sizeof(bool));
-        lf_print("Welcom to the psynth.");
-        lf_print("Keyboard mapping:");
-        lf_print(" w e   t y u");
-        lf_print("a s d f g h j");
-        lf_print("One keypress for NOTE_ON, another for NOTE_OFF");
-        lf_print("Number=Move all tones UP number of half-tones");
-        lf_print("Shift+Number=Move all tones DOWN number of half-tones");
-        lf_print("c=change oscillator");
-        lf_print("q=turn off all notes");
-    =}
+  keyboard = new KeyboardInput()
+  state key_pressed_next: bool*
+  state key_pressed: bool*
+  state octave: int = {= NOTE_C4 =}
+  state program: int = 0
 
-    logical action killall;
-    logical action modulate: int
-    logical action note_on: int
+  logical action killall
+  logical action modulate: int
+  logical action note_on: int
 
-    reaction(keyboard.key) -> midi_event, killall, modulate {=
-        int note = -1;
-        int program = -1;
+  reaction(startup) {=
+    self->key_pressed = (bool *) malloc(NOTE_G9*sizeof(bool));
+    self->key_pressed_next = (bool *) malloc(NOTE_G9*sizeof(bool));
+    lf_print("Welcom to the psynth.");
+    lf_print("Keyboard mapping:");
+    lf_print(" w e   t y u");
+    lf_print("a s d f g h j");
+    lf_print("One keypress for NOTE_ON, another for NOTE_OFF");
+    lf_print("Number=Move all tones UP number of half-tones");
+    lf_print("Shift+Number=Move all tones DOWN number of half-tones");
+    lf_print("c=change oscillator");
+    lf_print("q=turn off all notes");
+  =}
 
-        switch(keyboard.key->value) {
-            case 'a':
-                note=self->octave+0;
-                break;
-            case 'w':
-                note=self->octave+1;
-                break;
-            case 's':
-                note=self->octave+2;
-                break;
-            case 'e':
-                note=self->octave+3;
-                break;
-            case 'd':
-                note=self->octave+4;
-                break;
-            case 'f':
-                note=self->octave+5;
-                break;
-            case 't':
-                note=self->octave+6;
-                break;
-            case 'g':
-                note=self->octave+7;
-                break;
-            case 'y':
-                note=self->octave+8;
-                break;
-            case 'h':
-                note=self->octave+9;
-                break;
-            case 'u':
-                note=self->octave+10;
-                break;
-            case 'j':
-                note=self->octave+11;
-                break;
-            case 'k':
-                note=self->octave+12;
-                break;
-            case 'z':
-                self->octave-=12;
-                break;
-            case 'x':
-                self->octave+=12;
-                break;
-            case 'c':
-                program = (self->program+1) % NUM_OSC;
-                break;
-            case 'q':
-                lf_schedule(killall, 0);
-                break;
-            case '1':
-            case '2':
-            case '3':
-            case '4':
-            case '5':
-            case '6':
-            case '7':
-                lf_schedule_int(modulate, 0, keyboard.key->value - '0');
-                break;
-            case '!':
-                lf_schedule_int(modulate, 0, -1);
-                break;
-            case '@':
-                lf_schedule_int(modulate, 0, -2);
-                break;
-            case '#':
-                lf_schedule_int(modulate, 0, -3);
-                break;
-            case '$':
-                lf_schedule_int(modulate, 0, -4);
-                break;
-            case '%':
-                lf_schedule_int(modulate, 0, -5);
-                break;
-            case '^':
-                lf_schedule_int(modulate, 0, -6);
-                break;
-            case '&':
-                lf_schedule_int(modulate, 0, -7);
-                break;
-            default:
-                // lf_print("Illegal character");
-                return;
-                break;
-        }
+  reaction(keyboard.key) -> midi_event, killall, modulate {=
+    int note = -1;
+    int program = -1;
 
-        if (note >= 0) {
-            if (self->key_pressed[note]) {
-                midi_note_on_t temp = MIDI_NOTE_OFF(note);
-                memcpy(&midi_event->value, &temp, sizeof(temp));
-                self->key_pressed[note] = false;
-            } else {
-                midi_note_on_t temp = MIDI_NOTE_ON(note);
-                memcpy(&midi_event->value, &temp, sizeof(temp));
-                self->key_pressed[note] = true;
-            }
-            lf_set_present(midi_event);
-        } else if (program >= 0) {
-            midi_controller_change_t temp = MIDI_OSC_CHANGE(program);
+    switch(keyboard.key->value) {
+        case 'a':
+            note=self->octave+0;
+            break;
+        case 'w':
+            note=self->octave+1;
+            break;
+        case 's':
+            note=self->octave+2;
+            break;
+        case 'e':
+            note=self->octave+3;
+            break;
+        case 'd':
+            note=self->octave+4;
+            break;
+        case 'f':
+            note=self->octave+5;
+            break;
+        case 't':
+            note=self->octave+6;
+            break;
+        case 'g':
+            note=self->octave+7;
+            break;
+        case 'y':
+            note=self->octave+8;
+            break;
+        case 'h':
+            note=self->octave+9;
+            break;
+        case 'u':
+            note=self->octave+10;
+            break;
+        case 'j':
+            note=self->octave+11;
+            break;
+        case 'k':
+            note=self->octave+12;
+            break;
+        case 'z':
+            self->octave-=12;
+            break;
+        case 'x':
+            self->octave+=12;
+            break;
+        case 'c':
+            program = (self->program+1) % NUM_OSC;
+            break;
+        case 'q':
+            lf_schedule(killall, 0);
+            break;
+        case '1':
+        case '2':
+        case '3':
+        case '4':
+        case '5':
+        case '6':
+        case '7':
+            lf_schedule_int(modulate, 0, keyboard.key->value - '0');
+            break;
+        case '!':
+            lf_schedule_int(modulate, 0, -1);
+            break;
+        case '@':
+            lf_schedule_int(modulate, 0, -2);
+            break;
+        case '#':
+            lf_schedule_int(modulate, 0, -3);
+            break;
+        case '$':
+            lf_schedule_int(modulate, 0, -4);
+            break;
+        case '%':
+            lf_schedule_int(modulate, 0, -5);
+            break;
+        case '^':
+            lf_schedule_int(modulate, 0, -6);
+            break;
+        case '&':
+            lf_schedule_int(modulate, 0, -7);
+            break;
+        default:
+            // lf_print("Illegal character");
+            return;
+            break;
+    }
+
+    if (note >= 0) {
+        if (self->key_pressed[note]) {
+            midi_note_on_t temp = MIDI_NOTE_OFF(note);
             memcpy(&midi_event->value, &temp, sizeof(temp));
-            self->program = program;
-            lf_set_present(midi_event);
-        } 
-    =}
-    reaction(killall) -> killall, midi_event {=
-        for (int i=0; i<NOTE_G9; i++) {
-            if (self->key_pressed[i]) {    
-                midi_note_on_t temp = MIDI_NOTE_OFF(i);
-                memcpy(&midi_event->value, &temp, sizeof(temp));
-                self->key_pressed[i] = false;
-                lf_set_present(midi_event);
-                lf_schedule(killall, 0);
-                return;
-            }
+            self->key_pressed[note] = false;
+        } else {
+            midi_note_on_t temp = MIDI_NOTE_ON(note);
+            memcpy(&midi_event->value, &temp, sizeof(temp));
+            self->key_pressed[note] = true;
         }
-    =}
-    reaction(note_on) -> midi_event {=
-        midi_note_on_t temp = MIDI_NOTE_ON(note_on->value);
-        memcpy(&midi_event->value, &temp, sizeof(temp));
         lf_set_present(midi_event);
-    =}
+    } else if (program >= 0) {
+        midi_controller_change_t temp = MIDI_OSC_CHANGE(program);
+        memcpy(&midi_event->value, &temp, sizeof(temp));
+        self->program = program;
+        lf_set_present(midi_event);
+    }
+  =}
 
-    reaction(modulate) -> note_on, midi_event, modulate {=
-        for (int i=0; i<NOTE_G9; i++) {
-            if (self->key_pressed[i]) {    
-                midi_note_on_t temp = MIDI_NOTE_OFF(i);
-                memcpy(&midi_event->value, &temp, sizeof(temp));
-                self->key_pressed[i] = false;
-                int modulated_tone = i + modulate->value;
-                if (modulated_tone < 0) modulated_tone=0;
-                if (modulated_tone > NOTE_G9) modulated_tone=NOTE_G9;
+  reaction(killall) -> killall, midi_event {=
+    for (int i=0; i<NOTE_G9; i++) {
+        if (self->key_pressed[i]) {
+            midi_note_on_t temp = MIDI_NOTE_OFF(i);
+            memcpy(&midi_event->value, &temp, sizeof(temp));
+            self->key_pressed[i] = false;
+            lf_set_present(midi_event);
+            lf_schedule(killall, 0);
+            return;
+        }
+    }
+  =}
 
-                self->key_pressed_next[modulated_tone] = true;
-                lf_set_present(midi_event);
-                lf_schedule_int(note_on, 0, modulated_tone);
-                lf_schedule_int(modulate, 1, modulate->value);
-                return;
-            }
+  reaction(note_on) -> midi_event {=
+    midi_note_on_t temp = MIDI_NOTE_ON(note_on->value);
+    memcpy(&midi_event->value, &temp, sizeof(temp));
+    lf_set_present(midi_event);
+  =}
+
+  reaction(modulate) -> note_on, midi_event, modulate {=
+    for (int i=0; i<NOTE_G9; i++) {
+        if (self->key_pressed[i]) {
+            midi_note_on_t temp = MIDI_NOTE_OFF(i);
+            memcpy(&midi_event->value, &temp, sizeof(temp));
+            self->key_pressed[i] = false;
+            int modulated_tone = i + modulate->value;
+            if (modulated_tone < 0) modulated_tone=0;
+            if (modulated_tone > NOTE_G9) modulated_tone=NOTE_G9;
+
+            self->key_pressed_next[modulated_tone] = true;
+            lf_set_present(midi_event);
+            lf_schedule_int(note_on, 0, modulated_tone);
+            lf_schedule_int(modulate, 1, modulate->value);
+            return;
         }
-        for (int i=0; i<NOTE_G9; i++) {
-            self->key_pressed[i] = self->key_pressed_next[i];
-            self->key_pressed_next[i] = 0;
-        }
-    =}
+    }
+    for (int i=0; i<NOTE_G9; i++) {
+        self->key_pressed[i] = self->key_pressed_next[i];
+        self->key_pressed_next[i] = 0;
+    }
+  =}
 }

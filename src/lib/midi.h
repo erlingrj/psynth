@@ -15,11 +15,18 @@ typedef enum {
     SYS_MSG             = 0xF
 } midi_type_t;
 
+// This enum describes the different CONTROL_CHANGE messages.
+// This is inspired by Circuit Tracks.
 typedef enum {
-    SOUND_VARIATION = 70,
-    TIMBRE = 71,
-    RELEASE_TIME = 72,
-    ATTACK_TIME = 73,
+    OSCILLATOR = 80,
+    OSCILLATOR_MOD = 81,
+    AMP_ENVELOPE = 82,
+    FILTER_ENVELOPE = 83,
+    FILTER_FREQ = 84,
+    RESONANCE = 85,
+    MODULATION = 86,
+    FX = 87,
+    MASTER_FILTER = 74,
 } midi_controller_type_t;
 
 // TODO: Create some macros to turn an enum into a string
@@ -63,9 +70,9 @@ void print_midi(midi_base_msg_t * msg);
 
 typedef enum {
     OSC_SINE    = 0,
-    OSC_SQUARE  = 1,
-    OSC_SAW     = 2,
-    OSC_TRI     = 3,
+    OSC_TRI     = 1,
+    OSC_SQUARE  = 2,
+    OSC_SAW     = 3,
     NUM_OSC
 } osc_type_t;
 
@@ -92,6 +99,10 @@ midi_parser_t *create_midi_parser();
 #define MIDI_NOTE_OFF(x) {.status.channel=0, .status.type=NOTE_OFF, .pitch=x, .velocity=60}
 #define MIDI_OSC_CHANGE(x){.status.channel=0, .status.type=CONTROL_CHANGE, .controller=SOUND_VARIATION, .value=(x << 5)}
 
+typedef enum {
+    LANE_IDLE = -1,
+    LANE_RELEASING = -2,
+} lane_state_t;
 
 #define NOTE_CN1	0
 #define NOTE_CSN1	1

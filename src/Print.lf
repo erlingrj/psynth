@@ -1,18 +1,15 @@
-target C;
+target C
 
 preamble {=
-  #include "common.h"
-  #include "buffer.h"
-  #include <math.h>
-  #include <string.h>
+  #include "psynth.h"
 =}
 
-reactor Print(filename: string = "waves.csv", pg_name: string = "plot.pg", only_last:bool=true) {
-  input tsamples: sample_buffer_t *
-  input fsamples: fsample_buffer_t *
+reactor Print(filename: string = "waves.csv", pg_name: string = "plot.pg", only_last: bool = true) {
+  input tsamples: sample_buffer_t*
+  input fsamples: fsample_buffer_t*
 
   state file: FILE* = {= NULL =}
-  state cnt:int = 0;
+  state cnt: int = 0
 
   reaction(startup) {=
     self->file = fopen(self->filename, "w");
@@ -21,14 +18,14 @@ reactor Print(filename: string = "waves.csv", pg_name: string = "plot.pg", only_
     } else {
       fprintf(self->file, "Time,Amplitude\n");
     }
-    
+
 
     FILE *gnuplotScript = fopen(self->pg_name, "w");
     if (gnuplotScript == NULL) {
         perror("Error creating Gnuplot script file");
         return;
     }
-    
+
     fprintf(gnuplotScript, "set terminal pdf\n");
     fprintf(gnuplotScript, "set output '%s.pdf'\n", self->filename);
     fprintf(gnuplotScript, "set datafile separator ','\n");
