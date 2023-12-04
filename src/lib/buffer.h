@@ -19,4 +19,7 @@ void sample_buffer_destructor(void* array);
 void* fsample_buffer_copy(void *_source);
 void* sample_buffer_copy(void *_source);
 
+float magnitude(kiss_fft_cpx val);
+float phase(kiss_fft_cpx val);
+
 #endif

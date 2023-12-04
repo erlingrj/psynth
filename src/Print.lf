@@ -71,16 +71,16 @@ reactor Print(filename: string = "waves.csv", pg_name: string = "plot.pg", only_
       if(self->file == NULL) {
         lf_print_error_and_exit("Failed to open file: %s", self->filename);
       } else {
-        fprintf(self->file, "Time,Amplitude\n");
+        fprintf(self->file, "Time,Amplitude,Phase\n");
       }
     }
-    // FIXME: Here I only show 1/4 of the spectre because thats where everything is?
-    for (int i = 0; i<SAMPLE_SIZE/4; i++) {
+    for (int i = 0; i<SAMPLE_SIZE; i++) {
+      kiss_fft_cpx sample = fsamples->value->samples[i];
       fprintf(self->file,
-        "%i,%f\n",
+        "%i,%f,%f\n",
         i,
-        // FIXME: Is even the magnitude the right approach here?
-        sqrt(fsamples->value->samples[i].r * fsamples->value->samples[i].r + fsamples->value->samples[i].i * fsamples->value->samples[i].i)
+        magnitude(sample),
+        phase(sample)
       );
     }
   =}

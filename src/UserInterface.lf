@@ -160,6 +160,7 @@ reactor CursesUserInterface extends UserInterface {
   state key_pressed: bool*
   state octave: int = {= NOTE_C4 =}
   state program: int = 0
+  state filter_cutoff: int = 127;
 
   logical action killall
   logical action modulate: int
@@ -176,12 +177,16 @@ reactor CursesUserInterface extends UserInterface {
     lf_print("Number=Move all tones UP number of half-tones");
     lf_print("Shift+Number=Move all tones DOWN number of half-tones");
     lf_print("c=change oscillator");
+    lf_print("z/x= down/up an octave");
+    lf_print("v=increase filter cut-off");
+    lf_print("Shift+v=decrease filter cut-off");
     lf_print("q=turn off all notes");
   =}
 
   reaction(keyboard.key) -> midi_event, killall, modulate {=
     int note = -1;
     int program = -1;
+    int filter = -1;
 
     switch(keyboard.key->value) {
         case 'a':
@@ -231,6 +236,14 @@ reactor CursesUserInterface extends UserInterface {
             break;
         case 'c':
             program = (self->program+1) % NUM_OSC;
+            break;
+        case 'v':
+            filter = (self->filter_cutoff+1);
+            if (filter > 127) filter=127;
+            break;
+        case 'V':
+            filter = (self->filter_cutoff-1);
+            if (filter < 0) filter=0;
             break;
         case 'q':
             lf_schedule(killall, 0);
@@ -286,6 +299,11 @@ reactor CursesUserInterface extends UserInterface {
         midi_controller_change_t temp = MIDI_OSC_CHANGE(program);
         memcpy(&midi_event->value, &temp, sizeof(temp));
         self->program = program;
+        lf_set_present(midi_event);
+    } else if (filter >= 0) {
+        midi_controller_change_t temp = MIDI_FILTER_CUTOFF(filter);
+        memcpy(&midi_event->value, &temp, sizeof(temp));
+        self->filter_cutoff = filter;
         lf_set_present(midi_event);
     }
   =}

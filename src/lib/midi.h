@@ -95,9 +95,10 @@ int midi_parser(midi_parser_t *p, char recv);
 
 midi_parser_t *create_midi_parser();
 
-#define MIDI_NOTE_ON(x) {.status.channel=0, .status.type=NOTE_ON, .pitch=x, .velocity=60}
-#define MIDI_NOTE_OFF(x) {.status.channel=0, .status.type=NOTE_OFF, .pitch=x, .velocity=60}
-#define MIDI_OSC_CHANGE(x){.status.channel=0, .status.type=CONTROL_CHANGE, .controller=SOUND_VARIATION, .value=(x << 5)}
+#define MIDI_NOTE_ON(x) {.status.channel=0, .status.type=NOTE_ON, .pitch=(x), .velocity=60}
+#define MIDI_NOTE_OFF(x) {.status.channel=0, .status.type=NOTE_OFF, .pitch=(x), .velocity=60}
+#define MIDI_OSC_CHANGE(x){.status.channel=0, .status.type=CONTROL_CHANGE, .controller=OSCILLATOR, .value=((x) << 5)}
+#define MIDI_FILTER_CUTOFF(x){.status.channel=0, .status.type=CONTROL_CHANGE, .controller=FILTER_FREQ, .value=(x)}
 
 typedef enum {
     LANE_IDLE = -1,

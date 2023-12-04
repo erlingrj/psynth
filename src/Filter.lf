@@ -1,4 +1,4 @@
-target C
+target C;
 
 preamble {=
   #include "psynth.h"
@@ -7,45 +7,35 @@ preamble {=
 reactor FilterBase {
   mutable input in: fsample_buffer_t*
   output out: fsample_buffer_t*
-  input ctrl: midi_controller_change_t
+  input ctrl: midi_controller_change_t;
 }
 
 reactor SimpleFilter extends FilterBase {
-  state omegaC: double = 0
-  state alpha: double = 0
-  state beta: double = 0
-
   state cutoff_idx: int
 
   reaction(startup) {=
-    // Calculate filter coefficients
-    self->cutoff_idx = SAMPLE_SIZE-1;
+    self->cutoff_idx = SAMPLE_SIZE/2;
   =}
-
+  
   reaction(ctrl) {=
     switch(ctrl->value.controller) {
       case FILTER_ENVELOPE:
         break;
-      case FILTER_FREQ: {
-        int nyquist = SAMPLE_RATE/2;
-        double cutoff_freq = ctrl->value.value * nyquist / 127;
-        self->cutoff_idx = (int)(cutoff_freq * SAMPLE_SIZE / nyquist);
+      case FILTER_FREQ:
+      case MASTER_FILTER:
+        self->cutoff_idx = ctrl->value.value * SAMPLE_SIZE/ (127 * 2);
         break;
-      }
-      case MASTER_FILTER: {
-        int nyquist = SAMPLE_RATE/2;
-        double cutoff_freq = ctrl->value.value * nyquist / 127;
-        self->cutoff_idx = (int)(cutoff_freq * SAMPLE_SIZE / nyquist);
-        break;
-      }
     }
   =}
 
   reaction(in) -> out {=
-    // Apply filter
-    for (int i = self->cutoff_idx+1; i < SAMPLE_SIZE; i++) {
+    // Apply filter. Just skip frequencies above cutoff. Remember that
+    // the FFT will give out a mirror around SAMPLE_SIZE/2. 
+    for (int i = self->cutoff_idx; i<SAMPLE_SIZE/2; i++) {
       in->value->samples[i].r = 0;
       in->value->samples[i].i = 0;
+      in->value->samples[SAMPLE_SIZE-(i+1)].r = 0;
+      in->value->samples[SAMPLE_SIZE-(i+1)].i = 0;
     }
     lf_set_token(out, in->token);
   =}

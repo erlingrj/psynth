@@ -3,6 +3,7 @@ target C
 import FFT, IFFT from "FFT.lf"
 import SimpleFilter from "Filter.lf"
 import Merge, Lane from "Lane.lf"
+import Print from "Print.lf"
 
 preamble {=
   #include "psynth.h"
@@ -19,10 +20,12 @@ reactor Synth(n_lanes: int = 5) {
   fft = new FFT()
   ifft = new IFFT()
   filter = new SimpleFilter()
+  print = new Print()
 
   lanes.samples -> merge.in
   merge.out -> fft.tsamples
   fft.fsamples -> filter.in
+  fft.fsamples -> print.fsamples
   filter.out -> ifft.fsamples
   ifft.tsamples -> samples
 

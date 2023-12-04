@@ -114,3 +114,10 @@ void* fsample_buffer_copy(void *_source) {
   memcpy(copy, source, sizeof(fsample_buffer_t));
   return (void *) copy;
 }
+
+float magnitude(kiss_fft_cpx val) {
+  return sqrtf(val.i*val.i + val.r*val.r);
+}
+float phase(kiss_fft_cpx val) {
+  return atan(val.i/val.r);
+}
