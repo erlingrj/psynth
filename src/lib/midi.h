@@ -27,6 +27,7 @@ typedef enum {
     MODULATION = 86,
     FX = 87,
     MASTER_FILTER = 74,
+    VOLUME = RESONANCE,
 } midi_controller_type_t;
 
 // TODO: Create some macros to turn an enum into a string

@@ -31,7 +31,7 @@ reactor Lane(bank_index: int = 0) {
     lf_set(env.note_off, true);
   =}
 
-  reaction(ctrl) -> osc.type, env.ctrl {=
+  reaction(ctrl) -> osc.type, osc.amp, env.ctrl {=
     switch(ctrl->value.controller) {
           case OSCILLATOR: {
             osc_type_t osc_type = ctrl->value.value >> 5;
@@ -41,6 +41,11 @@ reactor Lane(bank_index: int = 0) {
             lf_set(osc.type, osc_type);
             break;
           }
+          case VOLUME: {
+            double amp = ((double )ctrl->value.value) / 127;
+            lf_set(osc.amp, amp);
+          }
+            break;
           case OSCILLATOR_MOD:
             break;
           case AMP_ENVELOPE:

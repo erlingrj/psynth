@@ -66,6 +66,7 @@ reactor Oscillator(initialType: osc_type_t = {= OSC_SINE =}) {
   =}
 
   input freq: double
+  input amp: double
   output samples: sample_buffer_t*
   input type: osc_type_t
   input dead: bool
@@ -73,7 +74,7 @@ reactor Oscillator(initialType: osc_type_t = {= OSC_SINE =}) {
   state phase: double = 0
   state freq: double = 0
   state period: double = 0
-  state amplitude: double = 1
+  state amplitude: double = 1.0
   state type: osc_type_t = initialType
   state on: bool = false
 
@@ -94,6 +95,10 @@ reactor Oscillator(initialType: osc_type_t = {= OSC_SINE =}) {
     self->freq = freq->value;
     self->period = 1/freq->value;
     self->on = true;
+  =}
+
+  reaction(amp) {=
+    self->amplitude = amp->value;
   =}
 
   reaction(type) {=
