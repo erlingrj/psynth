@@ -4,7 +4,7 @@
 #include <string.h>
 #include <stdio.h>
 #include "util.h"
-#define NUM_BUFFERS 32
+#define NUM_BUFFERS 1024
 
 sample_buffer_t _data[NUM_BUFFERS];
 fsample_buffer_t _fdata[NUM_BUFFERS];

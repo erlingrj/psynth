@@ -1,0 +1,59 @@
+target C;
+
+preamble {=
+  #include "psynth.h"
+  #define MAX_DELAY SEC(2)
+=}
+
+
+reactor Delay(initialDelayTime: time = 500 msec, initialDelayLevel: double = 0.5) {
+  input in: sample_buffer_t*
+  output out: sample_buffer_t*
+  input ctrl: midi_controller_change_t
+
+  logical action a(0 msec, 0 msec, "replace"): sample_buffer_t*
+  state sample_period: interval_t
+  state delay_period: interval_t
+  state level: double
+
+  reaction(startup) {=
+    self->sample_period = SEC(SAMPLE_SIZE)/SAMPLE_RATE;
+    self->delay_period = (self->initialDelayTime / self->sample_period) * self->sample_period;
+    self->level = (self->initialDelayLevel);
+  =}
+
+  reaction(ctrl) {=
+    switch(ctrl->value.controller) {
+      case DELAY_TIME: {
+        interval_t delay = ctrl->value.value * MAX_DELAY / 127;
+        self->delay_period = (delay / self->sample_period) * self->sample_period;
+        break;
+      }
+      case DELAY_LEVEL:
+        self->level = ctrl->value.value * 0.99 / 127;
+        break;
+    }
+  =}
+
+  reaction(in, a) -> out {=
+    lf_token_t * token; 
+    if (in->is_present) {
+      token = in->token;
+      if (a->is_present) {
+        for (int i = 0; i<SAMPLE_SIZE; i++) {
+          in->value->samples[i] += a->value->samples[i]*self->level;
+        }
+      }
+    } else {
+      for (int i = 0; i<SAMPLE_SIZE; i++) {
+        a->value->samples[i]*=self->level;
+      }
+      token = a->token;
+    }
+
+    if (self->level > 0 && self->delay_period > 0) {
+      lf_schedule_token(a, self->delay_period, token);
+    }
+    lf_set_token(out, token);
+  =}
+}

@@ -4,6 +4,7 @@ import FFT, IFFT from "FFT.lf"
 import SimpleFilter from "Filter.lf"
 import Merge, Lane from "Lane.lf"
 import Print from "Print.lf"
+import Delay from "Delay.lf"
 
 preamble {=
   #include "psynth.h"
@@ -17,17 +18,19 @@ reactor Synth(n_lanes: int = 5) {
   lanes = new[n_lanes] Lane()
   merge = new Merge(num_lanes=n_lanes)
 
+  delay = new Delay()
   fft = new FFT()
   ifft = new IFFT()
   filter = new SimpleFilter()
-  print = new Print()
+  // print = new Print()
 
   lanes.samples -> merge.in
   merge.out -> fft.tsamples
   fft.fsamples -> filter.in
-  fft.fsamples -> print.fsamples
+  // fft.fsamples -> print.fsamples
   filter.out -> ifft.fsamples
-  ifft.tsamples -> samples
+  ifft.tsamples -> delay.in
+  delay.out -> samples
 
   reaction(startup) {=
     self->lane_playing = (int *) malloc(self->n_lanes * sizeof(int));
@@ -36,10 +39,10 @@ reactor Synth(n_lanes: int = 5) {
     }
   =}
 
-  reaction(midi_event) -> lanes.note_on, lanes.note_off, lanes.ctrl, filter.ctrl {=
+  reaction(midi_event) -> lanes.note_on, lanes.note_off, lanes.ctrl, filter.ctrl, delay.ctrl {=
     midi_base_msg_t * midi_msg = &midi_event->value;
 
-    // print_midi(midi_msg);
+    print_midi(midi_msg);
 
     // Some MIDI keyboards dont send NOTE_OFF only NOTE_ON with velocity=0
     if (midi_msg->status.type == NOTE_ON &&
@@ -79,6 +82,7 @@ reactor Synth(n_lanes: int = 5) {
         midi_controller_change_t * program = (midi_controller_change_t *) midi_msg;
         switch(program->controller) {
           case OSCILLATOR:
+          case VOLUME:
           case OSCILLATOR_MOD:
           case AMP_ENVELOPE: {
             for (int i = 0; i<self->n_lanes; i++) {
@@ -87,6 +91,13 @@ reactor Synth(n_lanes: int = 5) {
             }
             break;
           }
+
+          case DELAY_TIME:
+          case DELAY_LEVEL:
+            memcpy(&delay.ctrl->value, program, sizeof(midi_controller_change_t));
+            lf_set_present(delay.ctrl);
+            break;
+
           case FILTER_ENVELOPE:
           case FILTER_FREQ:
           case MASTER_FILTER:
