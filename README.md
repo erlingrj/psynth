@@ -7,11 +7,12 @@ learn more about audio synthesis, waveforms, sound engineering etc. The ultimate
 goal of this project is to build a physical instrument.
 
 
+
 ## Getting started
 1. Install the Lingua Franca compiler: 
 `curl -Ls https://install.lf-lang.org | bash -s cli`
 2. Install the pulsaudio libraries: 
-`sudo apt install libpulse-dev`
+`sudo apt install libpulse-dev libpng-dev`
 3. Pull down KISSFFT submodule:
 `git submodule update --init`
 4. Compile libkissfft:

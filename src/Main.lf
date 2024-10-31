@@ -17,7 +17,7 @@ target C {
 
 import SoundOutput from "SoundOutput.lf"
 import Synth from "Synth.lf"
-import FileInterface as UserInterface from "UserInterface.lf"
+import CursesUserInterface as UserInterface from "UserInterface.lf"
 import Print from "Print.lf"
 
 preamble {=
