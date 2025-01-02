@@ -5,19 +5,12 @@
 #include "common.h"
 
 typedef struct {
-  SAMPLE_TYPE samples[SAMPLE_SIZE];
+  SAMPLE_TYPE buffer[SAMPLE_SIZE];
 } sample_buffer_t;
 
 typedef struct {
-  kiss_fft_cpx samples[SAMPLE_SIZE];
+  kiss_fft_cpx buffer[SAMPLE_SIZE];
 } fsample_buffer_t;
-
-fsample_buffer_t* fsample_buffer_ctor();
-sample_buffer_t* sample_buffer_ctor();
-void fsample_buffer_destructor(void* array);
-void sample_buffer_destructor(void* array);
-void* fsample_buffer_copy(void *_source);
-void* sample_buffer_copy(void *_source);
 
 float magnitude(kiss_fft_cpx val);
 float phase(kiss_fft_cpx val);

@@ -67,7 +67,7 @@ reactor Oscillator(initialType: osc_type_t = {= OSC_SINE =}) {
 
   input freq: double
   input amp: double
-  output samples: sample_buffer_t*
+  output samples: sample_buffer_t
   input type: osc_type_t
   input dead: bool
 
@@ -83,9 +83,7 @@ reactor Oscillator(initialType: osc_type_t = {= OSC_SINE =}) {
 
   logical action a
 
-  reaction(startup) -> samples, a {=
-    lf_set_destructor(samples, sample_buffer_destructor);
-    lf_set_copy_constructor(samples, sample_buffer_copy);
+  reaction(startup) -> a {=
     self->sample_period = SEC(SAMPLE_SIZE)/SAMPLE_RATE;
     lf_schedule(a,self->sample_period);
   =}
@@ -107,22 +105,21 @@ reactor Oscillator(initialType: osc_type_t = {= OSC_SINE =}) {
 
   reaction(a) -> samples, a {=
     if (self->on) {
-      sample_buffer_t * buffer = sample_buffer_ctor();
       switch (self->type) {
         case OSC_SINE:
-          self->phase = osc_sine(buffer->samples, self->amplitude, self->phase, self->freq, self->period);
+          self->phase = osc_sine(samples->value.buffer, self->amplitude, self->phase, self->freq, self->period);
           break;
         case OSC_SQUARE:
-          self->phase = osc_square(buffer->samples, self->amplitude, self->phase, self->freq, self->period);
+          self->phase = osc_square(samples->value.buffer, self->amplitude, self->phase, self->freq, self->period);
           break;
         case OSC_SAW:
-          self->phase = osc_saw(buffer->samples, self->amplitude, self->phase, self->freq, self->period);
+          self->phase = osc_saw(samples->value.buffer, self->amplitude, self->phase, self->freq, self->period);
           break;
         case OSC_TRI:
-          self->phase = osc_tri(buffer->samples, self->amplitude, self->phase, self->freq, self->period);
+          self->phase = osc_tri(samples->value.buffer, self->amplitude, self->phase, self->freq, self->period);
           break;
       }
-      lf_set(samples, buffer);
+      lf_set_present(samples);
     }
     lf_schedule(a, self->sample_period);
   =}

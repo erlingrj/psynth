@@ -11,7 +11,7 @@ reactor Lane(bank_index: int = 0) {
   input note_on: midi_note_on_t
   input note_off: midi_note_off_t
   input ctrl: midi_controller_change_t
-  output samples: sample_buffer_t*
+  output samples: sample_buffer_t
   output dead: bool
 
   osc = new Oscillator(initialType = {= OSC_SINE =})
@@ -57,13 +57,8 @@ reactor Lane(bank_index: int = 0) {
 }
 
 reactor Merge(num_lanes: int = 1) {
-  input[num_lanes] in: sample_buffer_t*
-  output out: sample_buffer_t*
-
-  reaction(startup) -> out {=
-    lf_set_destructor(out, sample_buffer_destructor);
-    lf_set_copy_constructor(out, sample_buffer_copy);
-  =}
+  input[num_lanes] in: sample_buffer_t
+  output out: sample_buffer_t
 
   reaction(in) -> out {=
     int n_present = 0;
@@ -74,14 +69,14 @@ reactor Merge(num_lanes: int = 1) {
     }
     // lf_print("n_present=%d", n_present);
 
-    sample_buffer_t * buffer = sample_buffer_ctor();
+    memset(&out->value, 0, sizeof(sample_buffer_t));
     for (int i=0; i<in_width; i++) {
       if (in[i]->is_present) {
         for (int j=0; j<SAMPLE_SIZE; j++) {
-          buffer->samples[j] += in[i]->value->samples[j]/self->num_lanes;
+          out->value.buffer[j] += in[i]->value.buffer[j]/self->num_lanes;
         }
       }
     }
-    lf_set(out, buffer);
+    lf_set_present(out);
   =}
 }

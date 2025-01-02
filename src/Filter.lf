@@ -5,8 +5,8 @@ preamble {=
 =}
 
 reactor FilterBase {
-  mutable input in: fsample_buffer_t*
-  output out: fsample_buffer_t*
+  input in: fsample_buffer_t
+  output out: fsample_buffer_t
   input ctrl: midi_controller_change_t;
 }
 
@@ -31,12 +31,13 @@ reactor SimpleFilter extends FilterBase {
   reaction(in) -> out {=
     // Apply filter. Just skip frequencies above cutoff. Remember that
     // the FFT will give out a mirror around SAMPLE_SIZE/2. 
+    memcpy(&out->value, &in->value, sizeof(fsample_buffer_t));
     for (int i = self->cutoff_idx; i<SAMPLE_SIZE/2; i++) {
-      in->value->samples[i].r = 0;
-      in->value->samples[i].i = 0;
-      in->value->samples[SAMPLE_SIZE-(i+1)].r = 0;
-      in->value->samples[SAMPLE_SIZE-(i+1)].i = 0;
+      out->value.buffer[i].r = 0;
+      out->value.buffer[i].i = 0;
+      out->value.buffer[SAMPLE_SIZE-(i+1)].r = 0;
+      out->value.buffer[SAMPLE_SIZE-(i+1)].i = 0;
     }
-    lf_set_token(out, in->token);
+    lf_set_present(out);
   =}
 }

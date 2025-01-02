@@ -7,8 +7,8 @@ preamble {=
 reactor AmplitudeEnvelope {
   input note_on: bool
   input note_off: bool
-  mutable input samples_raw: sample_buffer_t*
-  output samples: sample_buffer_t*
+  input samples_raw: sample_buffer_t
+  output samples: sample_buffer_t
 }
 
 // An amplitude envelope with 4 parameters. Uses modal reactors to
@@ -50,9 +50,6 @@ reactor ADSREnvelope(
     self->attack_rate = 1.0/self->attack;
     self->decay_rate= (1.0 - self->sustain)/self->decay;
     self->release_rate = self->sustain/self->release;
-
-    lf_set_destructor(samples, sample_buffer_destructor);
-    lf_set_copy_constructor(samples, sample_buffer_copy);
   =}
 
   initial mode Idle {
@@ -69,17 +66,16 @@ reactor ADSREnvelope(
 
   mode Attack {
     reaction(samples_raw) -> samples, reset(Decay) {=
-      sample_buffer_t *buffer = samples_raw->value;
       instant_t now = lf_time_logical_elapsed();
       instant_t ts = now - self->attack_start;
 
       SAMPLE_TYPE amp;
       for (int i = 0; i<SAMPLE_SIZE; i++) {
         amp = (ts + SEC(i*SAMPLE_STEP)) * self->attack_rate;
-        buffer->samples[i] = buffer->samples[i] * amp * self->velocity;
+        samples->value.buffer[i] = samples_raw->value.buffer[i] * amp * self->velocity;
       }
       self->amp_start = amp;
-      lf_set_token(samples, samples_raw->token);
+      lf_set_present(samples);
 
       if (now >= self->decay_start) {
         lf_set_mode(Decay);
@@ -94,17 +90,15 @@ reactor ADSREnvelope(
 
   mode Decay {
     reaction(samples_raw) -> samples, reset(Sustain) {=
-      sample_buffer_t *buffer = samples_raw->value;
-
       instant_t now = lf_time_logical_elapsed();
       instant_t ts  = now - self->decay_start;
       SAMPLE_TYPE amp;
 
       for (int i = 0; i<SAMPLE_SIZE; i++) {
         amp = self->amp_start - (ts + SEC(i*SAMPLE_STEP)) * self->decay_rate;
-        buffer->samples[i] = buffer->samples[i] * amp * self->velocity;
+        samples->value.buffer[i] = samples_raw->value.buffer[i] * amp * self->velocity;
       }
-      lf_set_token(samples, samples_raw->token);
+      lf_set_present(samples);
       self->amp_start = amp;
 
       if (now >= self->sustain_start || amp <= self->sustain) {
@@ -120,11 +114,10 @@ reactor ADSREnvelope(
 
   mode Sustain {
     reaction(samples_raw) -> samples {=
-      sample_buffer_t *buffer = samples_raw->value;
       for (int i = 0; i<SAMPLE_SIZE; i++) {
-        buffer->samples[i] = buffer->samples[i] * self->amp_start * self->velocity;
+        samples->value.buffer[i] = samples_raw->value.buffer[i] * self->amp_start * self->velocity;
       }
-      lf_set_token(samples, samples_raw->token);
+      lf_set_present(samples);
     =}
 
     reaction(note_off) -> reset(Release) {=
@@ -135,7 +128,6 @@ reactor ADSREnvelope(
 
   mode Release {
     reaction(samples_raw) -> samples, reset(Idle), dead {=
-      sample_buffer_t * buffer = samples_raw->value;
       instant_t now = lf_time_logical_elapsed();
       instant_t ts = now - self->release_start;
       bool done = false;
@@ -145,14 +137,14 @@ reactor ADSREnvelope(
             amp = 0;
             done = true;
           }
-          buffer->samples[i] = buffer->samples[i] * amp * self->velocity;
+          samples->value.buffer[i] = samples_raw->value.buffer[i] * amp * self->velocity;
         }
       if(done) {
         lf_set(dead, true);
         lf_set_mode(Idle);
       }
 
-      lf_set_token(samples, samples_raw->token);
+      lf_set_present(samples);
     =}
 
     reaction(note_on) {=
