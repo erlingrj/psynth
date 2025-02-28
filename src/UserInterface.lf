@@ -1,4 +1,4 @@
-target C
+target uC
 
 import WebSocketServer from "lib/WebSocketServer.lf"
 import KeyboardInput from "lib/Keyboard.lf"
@@ -143,8 +143,7 @@ reactor FileInterface extends UserInterface {
   =}
 
   reaction(a) -> midi_event {=
-    memcpy(&midi_event->value, &a->value, sizeof(midi_base_msg_t));
-    lf_set_present(midi_event);
+    lf_set(midi_event, a->value);
   =}
 
   reaction(shutdown) {=
@@ -287,24 +286,20 @@ reactor CursesUserInterface extends UserInterface {
     if (note >= 0) {
         if (self->key_pressed[note]) {
             midi_note_on_t temp = MIDI_NOTE_OFF(note);
-            memcpy(&midi_event->value, &temp, sizeof(temp));
             self->key_pressed[note] = false;
         } else {
             midi_note_on_t temp = MIDI_NOTE_ON(note);
-            memcpy(&midi_event->value, &temp, sizeof(temp));
             self->key_pressed[note] = true;
         }
-        lf_set_present(midi_event);
+        lf_set(midi_event, temp);
     } else if (program >= 0) {
         midi_controller_change_t temp = MIDI_OSC_CHANGE(program);
-        memcpy(&midi_event->value, &temp, sizeof(temp));
         self->program = program;
-        lf_set_present(midi_event);
+        lf_set(midi_event, temp);
     } else if (filter >= 0) {
         midi_controller_change_t temp = MIDI_FILTER_CUTOFF(filter);
-        memcpy(&midi_event->value, &temp, sizeof(temp));
         self->filter_cutoff = filter;
-        lf_set_present(midi_event);
+        lf_set(midi_event, temp);
     }
   =}
 
@@ -312,9 +307,8 @@ reactor CursesUserInterface extends UserInterface {
     for (int i=0; i<NOTE_G9; i++) {
         if (self->key_pressed[i]) {
             midi_note_on_t temp = MIDI_NOTE_OFF(i);
-            memcpy(&midi_event->value, &temp, sizeof(temp));
             self->key_pressed[i] = false;
-            lf_set_present(midi_event);
+            lf_set(midi_event, temp);
             lf_schedule(killall, 0);
             return;
         }
@@ -323,22 +317,20 @@ reactor CursesUserInterface extends UserInterface {
 
   reaction(note_on) -> midi_event {=
     midi_note_on_t temp = MIDI_NOTE_ON(note_on->value);
-    memcpy(&midi_event->value, &temp, sizeof(temp));
-    lf_set_present(midi_event);
+    lf_set(midi_event, temp);
   =}
 
   reaction(modulate) -> note_on, midi_event, modulate {=
     for (int i=0; i<NOTE_G9; i++) {
         if (self->key_pressed[i]) {
             midi_note_on_t temp = MIDI_NOTE_OFF(i);
-            memcpy(&midi_event->value, &temp, sizeof(temp));
             self->key_pressed[i] = false;
             int modulated_tone = i + modulate->value;
             if (modulated_tone < 0) modulated_tone=0;
             if (modulated_tone > NOTE_G9) modulated_tone=NOTE_G9;
 
             self->key_pressed_next[modulated_tone] = true;
-            lf_set_present(midi_event);
+            lf_set(midi_event, temp);
             lf_schedule_int(note_on, 0, modulated_tone);
             lf_schedule_int(modulate, 1, modulate->value);
             return;

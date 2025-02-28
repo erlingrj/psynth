@@ -12,7 +12,7 @@
  * @see ../rhythm/SensorSimulator.lf
  * @author Edward A. Lee
  */
-target C {
+target uC {
   keepalive: true,
   cmake-include: ["curses.cmake"]
 }

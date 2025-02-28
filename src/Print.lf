@@ -1,4 +1,4 @@
-target C
+target uC
 
 preamble {=
   #include "psynth.h"
@@ -51,7 +51,7 @@ reactor Print(filename: string = "waves.csv", pg_name: string = "plot.pg", only_
       }
     }
 
-    double t = lf_time_logical_elapsed() / 1.0e9;
+    double t = env->elapsed_logical_time(env) / 1.0e9;
     for (int i = 0; i<SAMPLE_SIZE; i++) {
       fprintf(self->file,
         "%f,%f\n",

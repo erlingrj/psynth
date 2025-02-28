@@ -38,7 +38,7 @@
  *
  * @author Edward A. Lee
  */
-target C {
+target uC {
   keepalive: true,
   cmake-include: ["WebSocketCmake.txt"]
 }

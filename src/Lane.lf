@@ -1,4 +1,4 @@
-target C
+target uC
 
 import Oscillator from "./Oscillator.lf"
 import ADSREnvelope from "./Envelope.lf"
@@ -49,8 +49,7 @@ reactor Lane(bank_index: int = 0) {
           case OSCILLATOR_MOD:
             break;
           case AMP_ENVELOPE:
-            memcpy(&env.ctrl->value, &ctrl->value, sizeof(midi_controller_change_t));
-            lf_set_present(env.ctrl);
+            lf_set(env.ctrl, ctrl->value);
             break;
     }
   =}
@@ -61,6 +60,8 @@ reactor Merge(num_lanes: int = 1) {
   output out: sample_buffer_t
 
   reaction(in) -> out {=
+    sample_buffer_t samples;
+    memset(&samples, 0, sizeof(sample_buffer_t));
     int n_present = 0;
     for (int i = 0; i<in_width; i++) {
       if (in[i]->is_present) {
@@ -69,14 +70,13 @@ reactor Merge(num_lanes: int = 1) {
     }
     // lf_print("n_present=%d", n_present);
 
-    memset(&out->value, 0, sizeof(sample_buffer_t));
     for (int i=0; i<in_width; i++) {
       if (in[i]->is_present) {
         for (int j=0; j<SAMPLE_SIZE; j++) {
-          out->value.buffer[j] += in[i]->value.buffer[j]/self->num_lanes;
+          samples.buffer[j] += in[i]->value.buffer[j]/self->num_lanes;
         }
       }
     }
-    lf_set_present(out);
+    lf_set(out, samples);
   =}
 }

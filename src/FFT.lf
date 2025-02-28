@@ -1,4 +1,4 @@
-target C
+target uC
 
 preamble {=
   #include "psynth.h"
@@ -20,9 +20,10 @@ reactor FFT {
       fin[i].r = tsamples->value.buffer[i];
       fin[i].i = 0;
     }
+    fsample_buffer_t samples;
 
-    kiss_fft(self->cfg, fin, fsamples->value.buffer);
-    lf_set_present(fsamples);
+    kiss_fft(self->cfg, fin, samples.buffer);
+    lf_set(fsamples, samples);
   =}
 }
 
@@ -39,9 +40,10 @@ reactor IFFT {
     kiss_fft_cpx fout[SAMPLE_SIZE];
 
     kiss_fft(self->cfg, fsamples->value.buffer, fout);
+    sample_buffer_t samples;
     for (int i=0; i<SAMPLE_SIZE; i++) {
-      tsamples->value.buffer[i] = fout[i].r/SAMPLE_SIZE;
+      samples.buffer[i] = fout[i].r/SAMPLE_SIZE;
     }
-    lf_set_present(tsamples);
+    lf_set(tsamples, samples);
   =}
 }

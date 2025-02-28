@@ -1,4 +1,4 @@
-target C {
+target uC {
   files: [
       "lib/psynth.h",
       "lib/midi.c",
@@ -11,8 +11,8 @@ target C {
       "../external/kissfft/kiss_fft.h",
       "../external/kissfft/libkissfft-float.a"],
   cmake-include: "lib/psynth.cmake",
-  workers: 4,
-  keepalive: true
+  keepalive: true,
+  platform: Native
 }
 
 import SoundOutput from "SoundOutput.lf"

@@ -1,7 +1,15 @@
-target C
+target uC
 
 preamble {=
   #include "psynth.h"
+
+  typedef enum {
+    MODE_IDLE,
+    MODE_ATTACK,
+    MODE_DECAY,
+    MODE_SUSTAIN,
+    MODE_RELEASE
+  } envelope_mode_t;
 =}
 
 reactor AmplitudeEnvelope {
@@ -30,8 +38,8 @@ reactor ADSREnvelope(
   state decay_start: time
   state release_start: time
   state sustain_start: time
-
   state amp_start: double = 0
+  state env_mode: envelope_mode_t = {=MODE_IDLE=}
 
   reaction(ctrl) {=
     switch (ctrl->value.controller) {
@@ -52,103 +60,100 @@ reactor ADSREnvelope(
     self->release_rate = self->sustain/self->release;
   =}
 
-  initial mode Idle {
-    reaction(note_on) velocity -> reset(Attack) {=
-      // lf_print("Attack");
-      self->attack_start = lf_time_logical_elapsed();
-      self->decay_start = self->attack_start + self->attack;
-      self->sustain_start = self->decay_start + self->decay;
-      self->amp_start = 0;
-      self->velocity = ((double)velocity->value)/127.0;
-      lf_set_mode(Attack);
-    =}
-  }
+    reaction(note_on) velocity -> samples {=
+      switch (self->env_mode) {
+      case MODE_IDLE:
+        // lf_print("Attack");
+        self->attack_start = env->elapsed_logical_time(env);
+        self->decay_start = self->attack_start + self->attack;
+        self->sustain_start = self->decay_start + self->decay;
+        self->amp_start = 0;
+        self->velocity = ((double)velocity->value)/127.0;
+        self->env_mode = MODE_ATTACK;
+        break;
+      case MODE_ATTACK: {
+        instant_t now = env->elapsed_logical_time(env);
+        instant_t ts = now - self->attack_start;
 
-  mode Attack {
-    reaction(samples_raw) -> samples, reset(Decay) {=
-      instant_t now = lf_time_logical_elapsed();
-      instant_t ts = now - self->attack_start;
-
-      SAMPLE_TYPE amp;
-      for (int i = 0; i<SAMPLE_SIZE; i++) {
-        amp = (ts + SEC(i*SAMPLE_STEP)) * self->attack_rate;
-        samples->value.buffer[i] = samples_raw->value.buffer[i] * amp * self->velocity;
-      }
-      self->amp_start = amp;
-      lf_set_present(samples);
-
-      if (now >= self->decay_start) {
-        lf_set_mode(Decay);
-      }
-    =}
-
-    reaction(note_off) -> reset(Release) {=
-      self->release_start = lf_time_logical_elapsed();
-      lf_set_mode(Release);
-    =}
-  }
-
-  mode Decay {
-    reaction(samples_raw) -> samples, reset(Sustain) {=
-      instant_t now = lf_time_logical_elapsed();
-      instant_t ts  = now - self->decay_start;
-      SAMPLE_TYPE amp;
-
-      for (int i = 0; i<SAMPLE_SIZE; i++) {
-        amp = self->amp_start - (ts + SEC(i*SAMPLE_STEP)) * self->decay_rate;
-        samples->value.buffer[i] = samples_raw->value.buffer[i] * amp * self->velocity;
-      }
-      lf_set_present(samples);
-      self->amp_start = amp;
-
-      if (now >= self->sustain_start || amp <= self->sustain) {
-        lf_set_mode(Sustain);
-      }
-    =}
-
-    reaction(note_off) -> reset(Release) {=
-      lf_set_mode(Release);
-      self->release_start = lf_time_logical_elapsed();
-    =}
-  }
-
-  mode Sustain {
-    reaction(samples_raw) -> samples {=
-      for (int i = 0; i<SAMPLE_SIZE; i++) {
-        samples->value.buffer[i] = samples_raw->value.buffer[i] * self->amp_start * self->velocity;
-      }
-      lf_set_present(samples);
-    =}
-
-    reaction(note_off) -> reset(Release) {=
-      lf_set_mode(Release);
-      self->release_start = lf_time_logical_elapsed();
-    =}
-  }
-
-  mode Release {
-    reaction(samples_raw) -> samples, reset(Idle), dead {=
-      instant_t now = lf_time_logical_elapsed();
-      instant_t ts = now - self->release_start;
-      bool done = false;
+        SAMPLE_TYPE amp;
+        sample_buffer_t _samples;
         for (int i = 0; i<SAMPLE_SIZE; i++) {
-          SAMPLE_TYPE amp = self->amp_start - (ts + SEC(i*SAMPLE_STEP)) * self->release_rate;
-          if (amp <= 0) {
-            amp = 0;
-            done = true;
-          }
-          samples->value.buffer[i] = samples_raw->value.buffer[i] * amp * self->velocity;
+          amp = (ts + SEC(i*SAMPLE_STEP)) * self->attack_rate;
+          _samples.buffer[i] = samples_raw->value.buffer[i] * amp * self->velocity;
         }
-      if(done) {
-        lf_set(dead, true);
-        lf_set_mode(Idle);
+        self->amp_start = amp;
+        lf_set(samples, _samples);
+
+        if (now >= self->decay_start) {
+          self->env_mode = MODE_DECAY;
+        }
+        break;
       }
+      case MODE_DECAY: {
+        instant_t now = env->elapsed_logical_time(env);
+        instant_t ts  = now - self->decay_start;
+        SAMPLE_TYPE amp;
 
-      lf_set_present(samples);
+        sample_buffer_t _samples;
+        for (int i = 0; i<SAMPLE_SIZE; i++) {
+          amp = self->amp_start - (ts + SEC(i*SAMPLE_STEP)) * self->decay_rate;
+          _samples.buffer[i] = samples_raw->value.buffer[i] * amp * self->velocity;
+        }
+        lf_set(samples, _samples);
+        self->amp_start = amp;
+
+        if (now >= self->sustain_start || amp <= self->sustain) {
+          self->env_mode = MODE_SUSTAIN;
+        }
+        break;
+      }
+      case MODE_SUSTAIN:
+        sample_buffer_t _samples;
+        for (int i = 0; i<SAMPLE_SIZE; i++) {
+          _samples.buffer[i] = samples_raw->value.buffer[i] * self->amp_start * self->velocity;
+        }
+        lf_set(samples, _samples);
+        break;
+      }
+      case MODE_RELEASE: {
+        instant_t now = env->elapsed_logical_time(env);
+        instant_t ts = now - self->release_start;
+        sample_buffer_t _samples;
+        bool done = false;
+          for (int i = 0; i<SAMPLE_SIZE; i++) {
+            SAMPLE_TYPE amp = self->amp_start - (ts + SEC(i*SAMPLE_STEP)) * self->release_rate;
+            if (amp <= 0) {
+              amp = 0;
+              done = true;
+            }
+            _samples.buffer[i] = samples_raw->value.buffer[i] * amp * self->velocity;
+          }
+        if(done) {
+          lf_set(dead, true);
+          self->env_mode = MODE_IDLE;
+        }
+        lf_set(samples, _samples);
+        break;
+      }
     =}
 
-    reaction(note_on) {=
-      lf_print_error_and_exit("Should not receive note_on in release mode");
+    reaction(note_off) {=
+      switch(self->env_mode) {
+        case MODE_ATTACK:
+          self->env_mode = MODE_RELEASE;
+          self->release_start = env->elapsed_logical_time(env);
+          break;
+        case MODE_DECAY:
+          self->env_mode = MODE_RELEASE;
+          self->release_start = env->elapsed_logical_time(env);
+          break;
+        case MODE_SUSTAIN:
+          self->env_mode = MODE_RELEASE;
+          self->release_start = env->elapsed_logical_time(env);
+          break;
+        case MODE_IDLE:
+          validate(false);
+          break;
+      }
     =}
-  }
 }

@@ -1,4 +1,4 @@
-target C
+target uC
 
 preamble {=
   #include "psynth.h"
@@ -26,7 +26,7 @@ reactor SoundOutput {
   =}
 
   reaction(samples) {=
-    // lf_print("Output delay=%lli", lf_time_physical() - lf_time_logical());
+    // lf_print("Output delay=%lli", env->physical_time(env) - env->logical_time(env));
     pa_simple_write(self->s, samples->value.buffer, SAMPLE_NUM_BYTES, NULL);
   =}
 }

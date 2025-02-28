@@ -1,4 +1,4 @@
-target C
+target uC
 
 preamble {=
   #include "psynth.h"
@@ -104,22 +104,23 @@ reactor Oscillator(initialType: osc_type_t = {= OSC_SINE =}) {
   =}
 
   reaction(a) -> samples, a {=
+    sample_buffer_t _samples;
     if (self->on) {
       switch (self->type) {
         case OSC_SINE:
-          self->phase = osc_sine(samples->value.buffer, self->amplitude, self->phase, self->freq, self->period);
+          self->phase = osc_sine(_samples.buffer, self->amplitude, self->phase, self->freq, self->period);
           break;
         case OSC_SQUARE:
-          self->phase = osc_square(samples->value.buffer, self->amplitude, self->phase, self->freq, self->period);
+          self->phase = osc_square(_samples.buffer, self->amplitude, self->phase, self->freq, self->period);
           break;
         case OSC_SAW:
-          self->phase = osc_saw(samples->value.buffer, self->amplitude, self->phase, self->freq, self->period);
+          self->phase = osc_saw(_samples.buffer, self->amplitude, self->phase, self->freq, self->period);
           break;
         case OSC_TRI:
-          self->phase = osc_tri(samples->value.buffer, self->amplitude, self->phase, self->freq, self->period);
+          self->phase = osc_tri(_samples.buffer, self->amplitude, self->phase, self->freq, self->period);
           break;
       }
-      lf_set_present(samples);
+      lf_set(samples, _samples);
     }
     lf_schedule(a, self->sample_period);
   =}

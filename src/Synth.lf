@@ -1,9 +1,10 @@
-target C
+target uC
 
 import FFT, IFFT from "FFT.lf"
 import SimpleFilter from "Filter.lf"
 import Merge, Lane from "Lane.lf"
 import Print from "Print.lf"
+import Compressor from "./Compressor.lf"
 import Delay from "Delay.lf"
 
 preamble {=
@@ -17,21 +18,22 @@ reactor Synth(n_lanes: int = 5) {
 
   lanes = new[n_lanes] Lane()
   merge = new Merge(num_lanes=n_lanes)
-
   delay = new Delay()
   fft = new FFT()
   ifft = new IFFT()
   filter = new SimpleFilter()
+  compressor = new Compressor()
   // print = new Print()
 
   lanes.samples -> merge.in
-  merge.out -> samples
-  // merge.out -> fft.tsamples
-  // fft.fsamples -> filter.in
-  // // fft.fsamples -> print.fsamples
-  // filter.out -> ifft.fsamples
-  // ifft.tsamples -> delay.in
-  // delay.out -> samples
+  // merge.out -> samples
+  merge.out -> fft.tsamples
+  fft.fsamples -> filter.in
+  // fft.fsamples -> print.fsamples
+  filter.out -> ifft.fsamples
+  ifft.tsamples -> delay.in
+  delay.out -> compressor.samples_raw
+  compressor.samples -> samples
 
   reaction(startup) {=
     self->lane_playing = (int *) malloc(self->n_lanes * sizeof(int));
@@ -40,7 +42,7 @@ reactor Synth(n_lanes: int = 5) {
     }
   =}
 
-  reaction(midi_event) -> lanes.note_on, lanes.note_off, lanes.ctrl, filter.ctrl, delay.ctrl {=
+  reaction(midi_event) -> lanes.note_on, lanes.note_off, lanes.ctrl, filter.ctrl {=
     midi_base_msg_t * midi_msg = &midi_event->value;
 
     print_midi(midi_msg);
@@ -93,11 +95,11 @@ reactor Synth(n_lanes: int = 5) {
             break;
           }
 
-          case DELAY_TIME:
-          case DELAY_LEVEL:
-            memcpy(&delay.ctrl->value, program, sizeof(midi_controller_change_t));
-            lf_set_present(delay.ctrl);
-            break;
+          // case DELAY_TIME:
+          // case DELAY_LEVEL:
+          //   memcpy(&delay.ctrl->value, program, sizeof(midi_controller_change_t));
+          //   lf_set_present(delay.ctrl);
+          //   break;
 
           case FILTER_ENVELOPE:
           case FILTER_FREQ:
@@ -112,7 +114,7 @@ reactor Synth(n_lanes: int = 5) {
 
   reaction(lanes.dead) {=
     for (int i = 0; i<self->n_lanes; i++) {
-      if (lanes[i].dead->is_present) {
+      if (lf_is_present(lanes[i].dead)) {
         // lf_print("DEAD lane %d", i);
         self->lane_playing[i] = LANE_IDLE;
       }
