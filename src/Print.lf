@@ -14,7 +14,7 @@ reactor Print(filename: string = "waves.csv", pg_name: string = "plot.pg", only_
   reaction(startup) {=
     self->file = fopen(self->filename, "w");
     if(self->file == NULL) {
-      lf_print_error_and_exit("Failed to open file: %s", self->filename);
+      validate(false);
     } else {
       fprintf(self->file, "Time,Amplitude\n");
     }
@@ -43,7 +43,7 @@ reactor Print(filename: string = "waves.csv", pg_name: string = "plot.pg", only_
         fclose(self->file);
         self->file = fopen(self->filename, "w");
         if(self->file == NULL) {
-          lf_print_error_and_exit("Failed to open file: %s", self->filename);
+          validate(false);
         } else {
           fprintf(self->file, "Time,Amplitude\n");
         }
@@ -51,7 +51,7 @@ reactor Print(filename: string = "waves.csv", pg_name: string = "plot.pg", only_
       }
     }
 
-    double t = env->elapsed_logical_time(env) / 1.0e9;
+    double t = env->get_elapsed_logical_time(env) / 1.0e9;
     for (int i = 0; i<SAMPLE_SIZE; i++) {
       fprintf(self->file,
         "%f,%f\n",
@@ -69,7 +69,7 @@ reactor Print(filename: string = "waves.csv", pg_name: string = "plot.pg", only_
       fclose(self->file);
       self->file = fopen(self->filename, "w");
       if(self->file == NULL) {
-        lf_print_error_and_exit("Failed to open file: %s", self->filename);
+        validate(false);
       } else {
         fprintf(self->file, "Time,Amplitude,Phase\n");
       }

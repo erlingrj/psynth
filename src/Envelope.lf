@@ -27,17 +27,18 @@ reactor ADSREnvelope(
     sustain: SAMPLE_TYPE = 0.8,
     release: time = 40 msec) extends AmplitudeEnvelope {
   input ctrl: midi_controller_change_t
-  input velocity: double
+  input velocity_in: int
   output dead: bool
+
   state attack_rate: double
   state decay_rate: double
   state release_rate: double
   state velocity: double
 
-  state attack_start: time
-  state decay_start: time
-  state release_start: time
-  state sustain_start: time
+  state attack_start: instant_t
+  state decay_start: instant_t
+  state release_start: instant_t
+  state sustain_start: instant_t
   state amp_start: double = 0
   state env_mode: envelope_mode_t = {=MODE_IDLE=}
 
@@ -60,19 +61,30 @@ reactor ADSREnvelope(
     self->release_rate = self->sustain/self->release;
   =}
 
-    reaction(note_on) velocity -> samples {=
-      switch (self->env_mode) {
+  reaction(note_on) velocity_in {=
+    switch (self->env_mode) {
       case MODE_IDLE:
         // lf_print("Attack");
-        self->attack_start = env->elapsed_logical_time(env);
+        self->attack_start = env->get_elapsed_logical_time(env);
         self->decay_start = self->attack_start + self->attack;
         self->sustain_start = self->decay_start + self->decay;
         self->amp_start = 0;
-        self->velocity = ((double)velocity->value)/127.0;
+        self->velocity = ((double)velocity_in->value)/127.0;
         self->env_mode = MODE_ATTACK;
         break;
+      case MODE_ATTACK:
+      case MODE_DECAY:
+      case MODE_SUSTAIN:
+      case MODE_RELEASE:
+      default:
+        validate(false);
+    }
+    =}
+
+    reaction(samples_raw) -> samples, dead {=
+      switch (self->env_mode) {
       case MODE_ATTACK: {
-        instant_t now = env->elapsed_logical_time(env);
+        instant_t now = env->get_elapsed_logical_time(env);
         instant_t ts = now - self->attack_start;
 
         SAMPLE_TYPE amp;
@@ -90,7 +102,7 @@ reactor ADSREnvelope(
         break;
       }
       case MODE_DECAY: {
-        instant_t now = env->elapsed_logical_time(env);
+        instant_t now = env->get_elapsed_logical_time(env);
         instant_t ts  = now - self->decay_start;
         SAMPLE_TYPE amp;
 
@@ -114,9 +126,8 @@ reactor ADSREnvelope(
         }
         lf_set(samples, _samples);
         break;
-      }
       case MODE_RELEASE: {
-        instant_t now = env->elapsed_logical_time(env);
+        instant_t now = env->get_elapsed_logical_time(env);
         instant_t ts = now - self->release_start;
         sample_buffer_t _samples;
         bool done = false;
@@ -135,21 +146,25 @@ reactor ADSREnvelope(
         lf_set(samples, _samples);
         break;
       }
+      case MODE_IDLE:
+      default:
+        break;
+    }
     =}
 
     reaction(note_off) {=
       switch(self->env_mode) {
         case MODE_ATTACK:
           self->env_mode = MODE_RELEASE;
-          self->release_start = env->elapsed_logical_time(env);
+          self->release_start = env->get_elapsed_logical_time(env);
           break;
         case MODE_DECAY:
           self->env_mode = MODE_RELEASE;
-          self->release_start = env->elapsed_logical_time(env);
+          self->release_start = env->get_elapsed_logical_time(env);
           break;
         case MODE_SUSTAIN:
           self->env_mode = MODE_RELEASE;
-          self->release_start = env->elapsed_logical_time(env);
+          self->release_start = env->get_elapsed_logical_time(env);
           break;
         case MODE_IDLE:
           validate(false);

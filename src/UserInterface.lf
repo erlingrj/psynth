@@ -1,6 +1,5 @@
 target uC
 
-import WebSocketServer from "lib/WebSocketServer.lf"
 import KeyboardInput from "lib/Keyboard.lf"
 
 preamble {=
@@ -9,53 +8,10 @@ preamble {=
 
 reactor UserInterface {
   preamble {=
-    #include "platform.h"
-            #include <stdio.h>
+    #include <stdio.h>
   =}
   input samples: sample_buffer_t*
   output midi_event: midi_base_msg_t
-}
-
-reactor WebSocketUserInterface extends UserInterface {
-  sock = new WebSocketServer(max_clients=1)
-  state wsi: void* = 0
-
-  state buffer: SAMPLE_TYPE*
-  state idx: int = 0
-
-  reaction(startup) {=
-    self->buffer = (SAMPLE_TYPE *) malloc(SAMPLE_NUM_BYTES);
-  =}
-
-  reaction(sock.received) -> midi_event {=
-    lf_print("Got MIDI from browser %s", sock.received->value->message);
-  =}
-
-  reaction(samples) -> sock.send {=
-    if (self->wsi) {
-        for (int i = 0; i<SAMPLE_SIZE; i=i+16) {
-            self->buffer[self->idx++] = samples->value->samples[i];
-        }
-        if (self->idx == SAMPLE_SIZE) {
-            char* message; web_socket_message_t* container = (web_socket_message_t*)malloc(sizeof(web_socket_message_t));
-            container->message = (char *) self->buffer;
-            container->length = SAMPLE_NUM_BYTES;
-            container->wsi = self->wsi;
-            lf_set(sock.send, container);
-            self->idx = 0;
-        }
-    }
-  =}
-
-  reaction(sock.connected) {=
-    if(sock.connected->value.connected) {
-        lf_print("New client connected to our web socket");
-        self->wsi = sock.connected->value.wsi;
-    } else {
-        lf_print("Client disconnected from our web socket");
-        self->wsi = 0;
-    }
-  =}
 }
 
 reactor FileInterface extends UserInterface {
@@ -90,10 +46,10 @@ reactor FileInterface extends UserInterface {
             ssize_t bytes_read = read(fd, &recv, 1);
             // Check for errors or end-of-file
             if (bytes_read < 0) {
-                lf_print("Error reading from MIDI device");
+                printf("Error reading from MIDI device\n");
                 return;
             } else if (bytes_read == 0) {
-                lf_print("Error reading from MIDI device");
+                printf("Error reading from MIDI device\n");
                 return;
             }
             // printf("%02x \n", (unsigned char) recv);
@@ -109,37 +65,37 @@ reactor FileInterface extends UserInterface {
     void* midi_reader_worker(void *action) {
         midi_parser_t *parser = create_midi_parser();
         if (!parser) {
-            lf_print_error_and_exit("Could not create midi parser");
+            validate(false);
         }
         while (!stop) {
             // Open the MIDI device file
             // FIXME: What is a reliable way of searching for any midi?
             int fd = open("/dev/midi1", O_RDONLY);
             if (fd > 0 ) {
-                lf_print("Found MIDI device!");
+                printf("Found MIDI device!\n");
                 midi_reader_loop(fd, action, parser);
             }
             fd = open("/dev/midi2", O_RDONLY);
             if (fd > 0 ) {
-                lf_print("Found MIDI device!");
+                printf("Found MIDI device!\n");
                 midi_reader_loop(fd, action, parser);
             }
             fd = open("/dev/midi3", O_RDONLY);
             if (fd > 0 ) {
-                lf_print("Found MIDI device!");
+                printf("Found MIDI device!\n");
                 midi_reader_loop(fd, action, parser);
             }
-            lf_sleep(SEC(1));
+            env->wait_for(env, SEC(1));
         }
     }
   =}
 
-  state thread: lf_thread_t
+  state thread: pthread_t
   physical action a: midi_base_msg_t
 
   reaction(startup) -> a {=
     // Start the thread that is blocking on reading input
-    lf_thread_create(&self->thread, &midi_reader_worker, a);
+    pthread_create(&self->thread, NULL, &midi_reader_worker, a);
   =}
 
   reaction(a) -> midi_event {=
@@ -149,7 +105,7 @@ reactor FileInterface extends UserInterface {
   reaction(shutdown) {=
     void* thread_exit_status;
     stop=true;
-    lf_thread_join(self->thread, &thread_exit_status);
+    pthread_join(self->thread, &thread_exit_status);
   =}
 }
 
@@ -168,18 +124,18 @@ reactor CursesUserInterface extends UserInterface {
   reaction(startup) {=
     self->key_pressed = (bool *) malloc(NOTE_G9*sizeof(bool));
     self->key_pressed_next = (bool *) malloc(NOTE_G9*sizeof(bool));
-    lf_print("Welcom to the psynth.");
-    lf_print("Keyboard mapping:");
-    lf_print(" w e   t y u");
-    lf_print("a s d f g h j");
-    lf_print("One keypress for NOTE_ON, another for NOTE_OFF");
-    lf_print("Number=Move all tones UP number of half-tones");
-    lf_print("Shift+Number=Move all tones DOWN number of half-tones");
-    lf_print("c=change oscillator");
-    lf_print("z/x= down/up an octave");
-    lf_print("v=increase filter cut-off");
-    lf_print("Shift+v=decrease filter cut-off");
-    lf_print("q=turn off all notes");
+    printf("Welcom to the psynth.\n");
+    printf("Keyboard mapping:\n");
+    printf(" w e   t y u\n");
+    printf("a s d f g h j\n");
+    printf("One keypress for NOTE_ON, another for NOTE_OFF\n");
+    printf("Number=Move all tones UP number of half-tones\n");
+    printf("Shift+Number=Move all tones DOWN number of half-tones\n");
+    printf("c=change oscillator\n");
+    printf("z/x= down/up an octave\n");
+    printf("v=increase filter cut-off\n");
+    printf("Shift+v=decrease filter cut-off\n");
+    printf("q=turn off all notes\n");
   =}
 
   reaction(keyboard.key) -> midi_event, killall, modulate {=
@@ -254,31 +210,30 @@ reactor CursesUserInterface extends UserInterface {
         case '5':
         case '6':
         case '7':
-            lf_schedule_int(modulate, 0, keyboard.key->value - '0');
+            lf_schedule(modulate, 0, keyboard.key->value - '0');
             break;
         case '!':
-            lf_schedule_int(modulate, 0, -1);
+            lf_schedule(modulate, 0, -1);
             break;
         case '@':
-            lf_schedule_int(modulate, 0, -2);
+            lf_schedule(modulate, 0, -2);
             break;
         case '#':
-            lf_schedule_int(modulate, 0, -3);
+            lf_schedule(modulate, 0, -3);
             break;
         case '$':
-            lf_schedule_int(modulate, 0, -4);
+            lf_schedule(modulate, 0, -4);
             break;
         case '%':
-            lf_schedule_int(modulate, 0, -5);
+            lf_schedule(modulate, 0, -5);
             break;
         case '^':
-            lf_schedule_int(modulate, 0, -6);
+            lf_schedule(modulate, 0, -6);
             break;
         case '&':
-            lf_schedule_int(modulate, 0, -7);
+            lf_schedule(modulate, 0, -7);
             break;
         default:
-            // lf_print("Illegal character");
             return;
             break;
     }
@@ -287,11 +242,12 @@ reactor CursesUserInterface extends UserInterface {
         if (self->key_pressed[note]) {
             midi_note_on_t temp = MIDI_NOTE_OFF(note);
             self->key_pressed[note] = false;
+            lf_set(midi_event, temp);
         } else {
             midi_note_on_t temp = MIDI_NOTE_ON(note);
             self->key_pressed[note] = true;
+            lf_set(midi_event, temp);
         }
-        lf_set(midi_event, temp);
     } else if (program >= 0) {
         midi_controller_change_t temp = MIDI_OSC_CHANGE(program);
         self->program = program;
@@ -331,8 +287,8 @@ reactor CursesUserInterface extends UserInterface {
 
             self->key_pressed_next[modulated_tone] = true;
             lf_set(midi_event, temp);
-            lf_schedule_int(note_on, 0, modulated_tone);
-            lf_schedule_int(modulate, 1, modulate->value);
+            lf_schedule(note_on, 0, modulated_tone);
+            lf_schedule(modulate, 1, modulate->value); // TODO: Why 1 nsec delay?
             return;
         }
     }

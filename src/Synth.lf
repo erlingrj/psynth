@@ -1,39 +1,37 @@
 target uC
 
-import FFT, IFFT from "FFT.lf"
-import SimpleFilter from "Filter.lf"
+// import FFT, IFFT from "FFT.lf"
+// import SimpleFilter from "Filter.lf"
 import Merge, Lane from "Lane.lf"
-import Print from "Print.lf"
-import Compressor from "./Compressor.lf"
-import Delay from "Delay.lf"
+// import Print from "Print.lf"
+// import Delay from "Delay.lf"
 
 preamble {=
   #include "psynth.h"
 =}
 
-reactor Synth(n_lanes: int = 5) {
+reactor Synth(n_lanes:int = 3) {
   input midi_event: midi_base_msg_t
   output samples: sample_buffer_t
   state lane_playing: int*
 
-  lanes = new[n_lanes] Lane()
-  merge = new Merge(num_lanes=n_lanes)
-  delay = new Delay()
-  fft = new FFT()
-  ifft = new IFFT()
-  filter = new SimpleFilter()
-  compressor = new Compressor()
+  lanes = new[3] Lane()
+  merge = new Merge()
+  // delay = new Delay()
+  // fft = new FFT()
+  // ifft = new IFFT()
+  // filter = new SimpleFilter()
   // print = new Print()
 
   lanes.samples -> merge.in
   // merge.out -> samples
-  merge.out -> fft.tsamples
-  fft.fsamples -> filter.in
-  // fft.fsamples -> print.fsamples
-  filter.out -> ifft.fsamples
-  ifft.tsamples -> delay.in
-  delay.out -> compressor.samples_raw
-  compressor.samples -> samples
+  // merge.out -> fft.tsamples
+  // fft.fsamples -> filter.in
+  // // fft.fsamples -> print.fsamples
+  // filter.out -> ifft.fsamples
+  // ifft.tsamples -> delay.in
+  // delay.out -> samples
+  merge.out -> samples
 
   reaction(startup) {=
     self->lane_playing = (int *) malloc(self->n_lanes * sizeof(int));
@@ -42,7 +40,7 @@ reactor Synth(n_lanes: int = 5) {
     }
   =}
 
-  reaction(midi_event) -> lanes.note_on, lanes.note_off, lanes.ctrl, filter.ctrl {=
+  reaction(midi_event) -> lanes.note_on, lanes.note_off, lanes.ctrl {=
     midi_base_msg_t * midi_msg = &midi_event->value;
 
     print_midi(midi_msg);
@@ -58,8 +56,7 @@ reactor Synth(n_lanes: int = 5) {
         midi_note_off_t * note_off = (midi_note_off_t *) midi_msg;
         for (int i = 0; i<self->n_lanes; i++) {
           if (self->lane_playing[i] == note_off->pitch) {
-            memcpy(&lanes[i].note_off->value, midi_msg, sizeof(midi_note_off_t));
-            lf_set_present(lanes[i].note_off);
+            lf_set(lanes[i].note_off, *note_off);
             self->lane_playing[i] = LANE_RELEASING;
             // lf_print("OFF: Found note at lane %d", i);
             break;
@@ -71,8 +68,7 @@ reactor Synth(n_lanes: int = 5) {
         midi_note_on_t * note_on = (midi_note_on_t *) midi_msg;
         for (int i = 0; i<self->n_lanes; i++) {
           if (self->lane_playing[i] == LANE_IDLE) {
-            memcpy(&lanes[i].note_on->value, midi_msg, sizeof(midi_note_on_t));
-            lf_set_present(lanes[i].note_on);
+            lf_set(lanes[i].note_on, *note_on);
             // lf_print("ON: Found note at lane %d", i);
             self->lane_playing[i] = note_on->pitch;
             break;
@@ -81,34 +77,26 @@ reactor Synth(n_lanes: int = 5) {
         break;
       }
 
-      case CONTROL_CHANGE: {
-        midi_controller_change_t * program = (midi_controller_change_t *) midi_msg;
-        switch(program->controller) {
-          case OSCILLATOR:
-          case VOLUME:
-          case OSCILLATOR_MOD:
-          case AMP_ENVELOPE: {
-            for (int i = 0; i<self->n_lanes; i++) {
-              memcpy(&lanes[i].ctrl->value, program, sizeof(midi_controller_change_t));
-              lf_set_present(lanes[i].ctrl);
-            }
-            break;
-          }
+      // case CONTROL_CHANGE: {
+      //   midi_controller_change_t * program = (midi_controller_change_t *) midi_msg;
+      //   switch(program->controller) {
+      //     case OSCILLATOR:
+      //     case VOLUME:
+      //     case OSCILLATOR_MOD:
+      //     case AMP_ENVELOPE: {
+      //       for (int i = 0; i<self->n_lanes; i++) {
+      //         lf_set(lanes[i].ctrl, *program);
+      //       }
+      //       break;
+      //     }
 
-          // case DELAY_TIME:
-          // case DELAY_LEVEL:
-          //   memcpy(&delay.ctrl->value, program, sizeof(midi_controller_change_t));
-          //   lf_set_present(delay.ctrl);
-          //   break;
-
-          case FILTER_ENVELOPE:
-          case FILTER_FREQ:
-          case MASTER_FILTER:
-            memcpy(&filter.ctrl->value, program, sizeof(midi_controller_change_t));
-            lf_set_present(filter.ctrl);
-            break;
-        }
-      }
+      //     case FILTER_ENVELOPE:
+      //     case FILTER_FREQ:
+      //     case MASTER_FILTER:
+      //       lf_set(filter.ctrl, *program);
+      //       break;
+      //   }
+      // }
     }
   =}
 

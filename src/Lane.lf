@@ -15,30 +15,30 @@ reactor Lane(bank_index: int = 0) {
   output dead: bool
 
   osc = new Oscillator(initialType = {= OSC_SINE =})
-  env = new ADSREnvelope()
-  osc.samples -> env.samples_raw
-  env.samples -> samples
-  env.dead -> osc.dead
-  env.dead -> dead
+  envelope = new ADSREnvelope()
+  osc.samples -> envelope.samples_raw
+  envelope.samples -> samples
+  envelope.dead -> osc.dead
+  envelope.dead -> dead
 
-  reaction(note_on) -> env.note_on, env.velocity, osc.freq {=
-    lf_set(env.note_on, true);
-    lf_set(env.velocity, note_on->value.velocity);
-    lf_set(osc.freq, freqs[note_on->value.pitch]);
+  reaction(note_on) -> envelope.note_on, envelope.velocity_in, osc.freq_in {=
+    lf_set(envelope.note_on, true);
+    lf_set(envelope.velocity_in, note_on->value.velocity);
+    lf_set(osc.freq_in, freqs[note_on->value.pitch]);
   =}
 
-  reaction(note_off) -> env.note_off {=
-    lf_set(env.note_off, true);
+  reaction(note_off) -> envelope.note_off {=
+    lf_set(envelope.note_off, true);
   =}
 
-  reaction(ctrl) -> osc.type, osc.amp, env.ctrl {=
+  reaction(ctrl) -> osc.type_in, osc.amp, envelope.ctrl {=
     switch(ctrl->value.controller) {
           case OSCILLATOR: {
             osc_type_t osc_type = ctrl->value.value >> 5;
             if(osc_type > 3) {
-              lf_print_error_and_exit("Error in oscillator type calculation");
+              validate(false);
             }
-            lf_set(osc.type, osc_type);
+            lf_set(osc.type_in, osc_type);
             break;
           }
           case VOLUME: {
@@ -49,14 +49,14 @@ reactor Lane(bank_index: int = 0) {
           case OSCILLATOR_MOD:
             break;
           case AMP_ENVELOPE:
-            lf_set(env.ctrl, ctrl->value);
+            lf_set(envelope.ctrl, ctrl->value);
             break;
     }
   =}
 }
 
-reactor Merge(num_lanes: int = 1) {
-  input[num_lanes] in: sample_buffer_t
+reactor Merge {
+  input[3] in: sample_buffer_t
   output out: sample_buffer_t
 
   reaction(in) -> out {=
@@ -64,16 +64,16 @@ reactor Merge(num_lanes: int = 1) {
     memset(&samples, 0, sizeof(sample_buffer_t));
     int n_present = 0;
     for (int i = 0; i<in_width; i++) {
-      if (in[i]->is_present) {
+      if (lf_is_present(in[i])) {
         n_present++;
       }
     }
     // lf_print("n_present=%d", n_present);
 
     for (int i=0; i<in_width; i++) {
-      if (in[i]->is_present) {
+      if (lf_is_present(in[i])) {
         for (int j=0; j<SAMPLE_SIZE; j++) {
-          samples.buffer[j] += in[i]->value.buffer[j]/self->num_lanes;
+          samples.buffer[j] += in[i]->value.buffer[j]/in_width;
         }
       }
     }

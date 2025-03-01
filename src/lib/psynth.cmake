@@ -1,5 +1,7 @@
 target_link_libraries(${LF_MAIN_TARGET} PRIVATE pulse-simple)
-target_link_libraries(${LF_MAIN_TARGET} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/libkissfft-float.a)
+target_link_libraries(${LF_MAIN_TARGET} PRIVATE m)
+target_link_libraries(${LF_MAIN_TARGET} PRIVATE curses)
+target_link_libraries(${LF_MAIN_TARGET} PRIVATE ${CMAKE_CURRENT_LIST_DIR}/../../external/kissfft/libkissfft-float.a)
 target_include_directories(${LF_MAIN_TARGET} PRIVATE ${CMAKE_CURRENT_LIST_DIR})
 target_include_directories(${LF_MAIN_TARGET} PRIVATE ${CMAKE_CURRENT_LIST_DIR}/../../external/kissfft)
 

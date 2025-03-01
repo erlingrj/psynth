@@ -1,5 +1,5 @@
 #include "midi.h"
-#include "util.h"
+#include "reactor-uc/error.h"
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -97,7 +97,7 @@ int midi_parser(midi_parser_t *p, char recv) {
     case READ_DATA:
       MIDI_DBG_PRINT(", READ_DATA-%d", p->buf_idx);
       if (p->buf_idx >= 3) {
-        lf_print_error_and_exit("midi_parser: buf_idx=3");
+        validate(false);
       }
       p->buffer[p->buf_idx++] = recv;
       if (p->bytes_to_read == p->buf_idx) {
@@ -156,26 +156,26 @@ void print_midi(midi_base_msg_t * msg) {
   switch (msg->status.type) {
     case NOTE_ON: {
       midi_note_on_t * tmp = (midi_note_on_t *) msg;
-      lf_print("Type: NOTE_ON\tChannel=%u\tPitch=%u\tVelocity=%u", tmp->status.channel, tmp->pitch, tmp->velocity);
+      printf("Type: NOTE_ON\tChannel=%u\tPitch=%u\tVelocity=%u\n", tmp->status.channel, tmp->pitch, tmp->velocity);
       break;
     }
     case NOTE_OFF: {
       midi_note_off_t * tmp = (midi_note_off_t *) msg;
-      lf_print("Type: NOTE_OFF Channel=%u\tPitch=%u\tVelocity=%u", tmp->status.channel, tmp->pitch, tmp->velocity);
+      printf("Type: NOTE_OFF Channel=%u\tPitch=%u\tVelocity=%u\n", tmp->status.channel, tmp->pitch, tmp->velocity);
       break;
     }
     case CONTROL_CHANGE: {
       midi_controller_change_t * tmp = (midi_controller_change_t *) msg;
-      lf_print("Type: CONTROL_CHANGE Channel=%u\tController=%u\tValue=%u", tmp->status.channel, tmp->controller, tmp->value);
+      printf("Type: CONTROL_CHANGE Channel=%u\tController=%u\tValue=%u\n", tmp->status.channel, tmp->controller, tmp->value);
       break;
     }
     case PATCH_CHANGE: {
       midi_program_change_t * tmp = (midi_program_change_t *) msg;
-      lf_print("Type: PROGRAM_CHANGE Channel=%u\tProgram=%u", tmp->status.channel, tmp->program);
+      printf("Type: PROGRAM_CHANGE Channel=%u\tProgram=%u\n", tmp->status.channel, tmp->program);
       break;
     }
     default:
-      lf_print("Type: %u UNRECOGNIZED\tChannel=%u", msg->status.type, msg->status.channel);
+      printf("Type: %u UNRECOGNIZED\tChannel=%u\n", msg->status.type, msg->status.channel);
       break;
   }
 }

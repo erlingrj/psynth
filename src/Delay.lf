@@ -10,6 +10,7 @@ reactor Delay(initialDelayTime: time = 1 sec, initialDelayLevel: double = 0.8) {
   input in: sample_buffer_t
   output out: sample_buffer_t
 
+  @max_pending_events(1000)
   logical action a(0 msec, 0 msec, "replace"): sample_buffer_t
   state sample_period: interval_t
   state delay_period: interval_t
@@ -23,7 +24,7 @@ reactor Delay(initialDelayTime: time = 1 sec, initialDelayLevel: double = 0.8) {
 
   reaction(in) -> a {=
     if (self->level > 0 && self->delay_period > 0) {
-      lf_schedule_copy(a, self->delay_period, &in->value, 1);
+      lf_schedule(a, self->delay_period, in->value);
     }
   =}
 

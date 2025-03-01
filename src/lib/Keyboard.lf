@@ -20,10 +20,6 @@ target uC {
 preamble {=
   #ifndef KEYBOARD_PREAMBLE
   #define KEYBOARD_PREAMBLE
-  typedef struct keyboard_input_t {
-    void* keypress; // Pointer to physical action.
-    int exit_key;   // Keycode for exiting.
-  } keyboard_input_t;
   #endif
 =}
 
@@ -32,19 +28,26 @@ reactor KeyboardInput(exit_key: int = 0) {
   physical action keypress: int
 
   preamble {=
-    #include "platform.h"
+    #include <pthread.h>
     #include <curses.h>
     #include <signal.h>
+
+    typedef struct keyboard_input_t {
+      Reactor_KeyboardInput_keypress* keypress; // Pointer to physical action.
+      int exit_key;   // Keycode for exiting.
+    }   keyboard_input_t;
+    
     // Thread to read input characters until an EOF is received.
     // Each time a character is received, schedule a keypress action.
-    void* read_input(void* keyboard_input) {
+    void* read_input(void* _keyboard_input) {
+      keyboard_input_t* keyboard_input = (keyboard_input_t*)_keyboard_input;
       int c;
       while((c = getch()) != EOF) {
-        if (c == ((keyboard_input_t*)keyboard_input)->exit_key) {
-          lf_request_stop();
+        if (c == keyboard_input->exit_key) {
+          exit(1);
           break;
         }
-        lf_schedule_copy(((keyboard_input_t*)keyboard_input)->keypress, 0, &c, 1);
+        lf_schedule(keyboard_input->keypress, 0, c);
       }
       return NULL;
     }
@@ -58,7 +61,7 @@ reactor KeyboardInput(exit_key: int = 0) {
     }
     // Function for orderly shutdown upon control-c.
     void sig_handler(int sig) {
-      lf_request_stop();
+      exit(1);
     }
   =}
 
@@ -74,11 +77,11 @@ reactor KeyboardInput(exit_key: int = 0) {
     }
     refresh();
 
-    // Register a print function handler so lf_print works.
-    lf_register_print_function(print_to_terminal, LOG_LEVEL_ALL);
+    // // Register a print function handler so lf_print works.
+    // lf_register_print_function(print_to_terminal, LOG_LEVEL_ALL);
 
     if (signal(SIGINT, sig_handler) == SIG_ERR) {
-      lf_print_warning("Failed to register signal handler. After exit, may have to reset terminal using 'reset'.");
+      validate(false);
     }
 
     static keyboard_input_t keyboard_input;
@@ -86,8 +89,8 @@ reactor KeyboardInput(exit_key: int = 0) {
     keyboard_input.exit_key = self->exit_key;
 
     // Start the thread that listens for key presses.
-    lf_thread_t thread_id;
-    lf_thread_create(&thread_id, &read_input, &keyboard_input);
+    pthread_t thread_id;
+    pthread_create(&thread_id, NULL, read_input, &keyboard_input);
   =}
 
   reaction(keypress) -> key {=
@@ -96,7 +99,7 @@ reactor KeyboardInput(exit_key: int = 0) {
 
   reaction(shutdown) {=
     endwin();
-    lf_register_print_function(NULL, -1);
+    // lf_register_print_function(NULL, -1);
   =}
 }
 
@@ -104,6 +107,6 @@ main reactor {
   k = new KeyboardInput(exit_key=120)
 
   reaction(k.key) {=
-    lf_print("You typed %c (keycode %d).", k.key->value, k.key->value);
+    printf("You typed %c (keycode %d)\n", k.key->value, k.key->value);
   =}
 }
