@@ -7,11 +7,11 @@ preamble {=
 
 
 reactor Delay(initialDelayTime: time = 500 msec, initialDelayLevel: double = 0.5) {
-  input in: sample_buffer_t*
-  output out: sample_buffer_t*
+  input in: sample_buffer_t
+  output out: sample_buffer_t
   input ctrl: midi_controller_change_t
 
-  logical action a(0 msec, 0 msec, "replace"): sample_buffer_t*
+  logical action a(0 msec, 0 msec, "replace"): sample_buffer_t
   state sample_period: interval_t
   state delay_period: interval_t
   state level: double
@@ -35,25 +35,18 @@ reactor Delay(initialDelayTime: time = 500 msec, initialDelayLevel: double = 0.5
     }
   =}
 
-  reaction(in, a) -> out {=
-    lf_token_t * token; 
-    if (in->is_present) {
-      token = in->token;
-      if (a->is_present) {
-        for (int i = 0; i<SAMPLE_SIZE; i++) {
-          in->value->samples[i] += a->value->samples[i]*self->level;
-        }
-      }
-    } else {
+  reaction(in) a -> a, out {=
+    memcpy(&out->value, &in->value, sizeof(sample_buffer_t));
+    if (a->is_present) {
       for (int i = 0; i<SAMPLE_SIZE; i++) {
-        a->value->samples[i]*=self->level;
+        out->value.buffer[i] += a->value.buffer[i]*self->level;
       }
-      token = a->token;
     }
-
+    
     if (self->level > 0 && self->delay_period > 0) {
-      lf_schedule_token(a, self->delay_period, token);
+      lf_schedule_copy(a, self->delay_period, &in->value, 1);
     }
-    lf_set_token(out, token);
+   
+    lf_set_present(out);
   =}
 }

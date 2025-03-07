@@ -11,11 +11,11 @@ reactor SoundOutput {
     #include <stdlib.h>
     #include <stdint.h>
   =}
-  input samples: sample_buffer_t*
+  input samples: sample_buffer_t
   state spec: pa_sample_spec
   state s: pa_simple*
 
-  reaction(startup) samples {=
+  reaction(startup) {=
        // Initialize spec
        self->spec.format = PA_SAMPLE_FLOAT32;
        self->spec.rate = SAMPLE_RATE;
@@ -27,6 +27,6 @@ reactor SoundOutput {
 
   reaction(samples) {=
     // lf_print("Output delay=%lli", lf_time_physical() - lf_time_logical());
-            pa_simple_write(self->s, samples->value->samples, SAMPLE_NUM_BYTES, NULL);
+    pa_simple_write(self->s, samples->value.buffer, SAMPLE_NUM_BYTES, NULL);
   =}
 }
