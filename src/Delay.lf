@@ -6,7 +6,7 @@ preamble {=
 =}
 
 
-reactor Delay(initialDelayTime: time = 1 sec, initialDelayLevel: double = 0.8) {
+reactor Delay(initialDelayTime: time = 1 sec, initialDelayLevel: double = 0.5) {
   input in: sample_buffer_t
   output out: sample_buffer_t
 

@@ -33,18 +33,21 @@ reactor Compressor {
     #define FALLOFF 0.01
   =}
 
-  mutable input samples_raw: sample_buffer_t*
-  output samples: sample_buffer_t*
+  input in: sample_buffer_t
+  output out: sample_buffer_t
+
   state compression: SAMPLE_TYPE = {= NEUTRAL =}
   state compressing: bool = false
 
-  reaction(samples_raw) -> samples {=
+  reaction(in) -> out {=
+    sample_buffer_t samples;
+
     SAMPLE_TYPE min = 0;
     SAMPLE_TYPE max = 0;
     SAMPLE_TYPE compress = 0;
 
     for (int i = 0; i<SAMPLE_SIZE; i++) {
-      SAMPLE_TYPE v = samples_raw->value->samples[i];
+      SAMPLE_TYPE v = in->value.buffer[i];
       if (v < min) {
         min = v;
       }
@@ -68,40 +71,13 @@ reactor Compressor {
 
     // Compress
     if (self->compressing) {
+      printf("Compressing with %f\n", self->compression);
       for (int i = 0; i<SAMPLE_SIZE; i++) {
-        samples_raw->value->samples[i] /= self->compression;
+        samples.buffer[i] = in->value.buffer[i] / self->compression;
       }
+      lf_set(out, samples);
+    } else {
+      lf_set(out, in->value);
     }
-    lf_set_token(samples, samples_raw->token);
-  =}
-}
-
-reactor Clipper(max: float = 0.5) {
-  mutable input samples_raw: sample_buffer_t*
-  output samples: sample_buffer_t*
-
-  reaction(samples_raw) -> samples {=
-    for (int i = 0; i<SAMPLE_SIZE; i++) {
-      SAMPLE_TYPE *v = &samples_raw->value->samples[i];
-      if (*v < -self->max) {
-        *v = -self->max;
-      }
-      if (*v > self->max) {
-        *v = self->max;
-      }
-    }
-    lf_set_token(samples, samples_raw->token);
-  =}
-}
-
-reactor Scale {
-  mutable input samples_raw: sample_buffer_t*
-  output samples: sample_buffer_t*
-
-  reaction(samples_raw) -> samples {=
-    for (int i = 0; i<SAMPLE_SIZE; i++) {
-      samples_raw->value->samples[i] *= 0.5;
-    }
-    lf_set_token(samples, samples_raw->token);
   =}
 }

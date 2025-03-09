@@ -19,7 +19,6 @@ target uC {
 import SoundOutput from "SoundOutputSDL.lf"
 import Synth from "Synth.lf"
 import CursesUserInterface as UserInterface from "UserInterface.lf"
-import Print from "Print.lf"
 
 preamble {=
   #include "psynth.h"
@@ -31,10 +30,5 @@ main reactor {
   ui = new UserInterface()
   ui.midi_event -> synth.midi_event
   synth.check_for_event -> ui.check_for_event
-  // // Printing and creating waveforms. Just for debug
-  // tprint1 = new Print(filename="t1.csv", pg_name="t1.gp", only_last=true)
-  // synth.samples -> tprint1.tsamples
-  // tprint2 = new Print(filename="t2.csv", pg_name="t2.gp", only_last=false)
-  // ifft.tsamples -> tprint2.tsamples
   synth.samples -> out.samples
 }

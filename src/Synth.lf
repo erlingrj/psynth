@@ -1,10 +1,10 @@
 target uC
 
-// import FFT, IFFT from "FFT.lf"
-// import SimpleFilter from "Filter.lf"
+import FFT, IFFT from "FFT.lf"
+import SimpleFilter from "Filter.lf"
+import Compressor from "Compressor.lf"
 import Merge, Lane from "Lane.lf"
-// import Print from "Print.lf"
-// import Delay from "Delay.lf"
+import Delay from "Delay.lf"
 
 preamble {=
   #include "psynth.h"
@@ -18,21 +18,18 @@ reactor Synth(n_lanes:int = 3) {
 
   lanes = new[3] Lane()
   merge = new Merge()
-  // delay = new Delay()
-  // fft = new FFT()
-  // ifft = new IFFT()
-  // filter = new SimpleFilter()
-  // print = new Print()
+  delay = new Delay()
+  fft = new FFT()
+  ifft = new IFFT()
+  filter = new SimpleFilter()
+  compressor = new Compressor()
 
   lanes.samples -> merge.in
-  // merge.out -> samples
-  // merge.out -> fft.tsamples
-  // fft.fsamples -> filter.in
-  // // fft.fsamples -> print.fsamples
-  // filter.out -> ifft.fsamples
-  // ifft.tsamples -> delay.in
-  // delay.out -> samples
-  merge.out -> samples
+  merge.out -> fft.tsamples
+  fft.fsamples -> filter.in
+  filter.out -> ifft.fsamples
+  ifft.tsamples -> compressor.in
+  compressor.out -> samples
 
   logical action a
 
@@ -54,7 +51,7 @@ reactor Synth(n_lanes:int = 3) {
     lf_set(check_for_event, true);
   =}
 
-  reaction(midi_event) -> lanes.note_on, lanes.note_off, lanes.ctrl {=
+  reaction(midi_event) -> lanes.note_on, lanes.note_off, lanes.ctrl, filter.ctrl {=
     midi_base_msg_t * midi_msg = &midi_event->value;
 
     print_midi(midi_msg);
@@ -91,26 +88,26 @@ reactor Synth(n_lanes:int = 3) {
         break;
       }
 
-      // case CONTROL_CHANGE: {
-      //   midi_controller_change_t * program = (midi_controller_change_t *) midi_msg;
-      //   switch(program->controller) {
-      //     case OSCILLATOR:
-      //     case VOLUME:
-      //     case OSCILLATOR_MOD:
-      //     case AMP_ENVELOPE: {
-      //       for (int i = 0; i<self->n_lanes; i++) {
-      //         lf_set(lanes[i].ctrl, *program);
-      //       }
-      //       break;
-      //     }
+      case CONTROL_CHANGE: {
+        midi_controller_change_t * program = (midi_controller_change_t *) midi_msg;
+        switch(program->controller) {
+          case OSCILLATOR:
+          case VOLUME:
+          case OSCILLATOR_MOD:
+          case AMP_ENVELOPE: {
+            for (int i = 0; i<self->n_lanes; i++) {
+              lf_set(lanes[i].ctrl, *program);
+            }
+            break;
+          }
 
-      //     case FILTER_ENVELOPE:
-      //     case FILTER_FREQ:
-      //     case MASTER_FILTER:
-      //       lf_set(filter.ctrl, *program);
-      //       break;
-      //   }
-      // }
+          case FILTER_ENVELOPE:
+          case FILTER_FREQ:
+          case MASTER_FILTER:
+            lf_set(filter.ctrl, *program);
+            break;
+        }
+      }
     }
   =}
 
