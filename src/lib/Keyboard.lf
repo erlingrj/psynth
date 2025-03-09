@@ -20,22 +20,26 @@ target uC {
 preamble {=
   #ifndef KEYBOARD_PREAMBLE
   #define KEYBOARD_PREAMBLE
+    #include <pthread.h>
+
+    typedef struct keyboard_input_t {
+      pthread_mutex_t mutex; 
+      bool new_pressed;
+      char key_pressed; // Which key was pressed
+      int exit_key;   // Keycode for exiting.
+    } keyboard_input_t;
+
   #endif
 =}
 
 reactor KeyboardInput(exit_key: int = 0) {
   output key: int
-  physical action keypress: int
+  input check_for_event: bool
 
   preamble {=
     #include <pthread.h>
     #include <curses.h>
     #include <signal.h>
-
-    typedef struct keyboard_input_t {
-      Reactor_KeyboardInput_keypress* keypress; // Pointer to physical action.
-      int exit_key;   // Keycode for exiting.
-    }   keyboard_input_t;
     
     // Thread to read input characters until an EOF is received.
     // Each time a character is received, schedule a keypress action.
@@ -47,7 +51,10 @@ reactor KeyboardInput(exit_key: int = 0) {
           exit(1);
           break;
         }
-        lf_schedule(keyboard_input->keypress, 0, c);
+        pthread_mutex_lock(&keyboard_input->mutex);
+        keyboard_input->new_pressed = true;
+        keyboard_input->key_pressed = c;
+        pthread_mutex_unlock(&keyboard_input->mutex);
       }
       return NULL;
     }
@@ -65,7 +72,9 @@ reactor KeyboardInput(exit_key: int = 0) {
     }
   =}
 
-  reaction(startup) -> keypress {=
+  state keyboard_input: keyboard_input_t
+
+  reaction(startup) {=
     initscr();  // Initialize the curses library
     cbreak();   // Disable line buffering
     noecho();   // Disable automatic echoing of typed characters
@@ -77,24 +86,25 @@ reactor KeyboardInput(exit_key: int = 0) {
     }
     refresh();
 
-    // // Register a print function handler so lf_print works.
-    // lf_register_print_function(print_to_terminal, LOG_LEVEL_ALL);
-
     if (signal(SIGINT, sig_handler) == SIG_ERR) {
       validate(false);
     }
 
-    static keyboard_input_t keyboard_input;
-    keyboard_input.keypress = keypress;
-    keyboard_input.exit_key = self->exit_key;
+    self->keyboard_input.exit_key = self->exit_key;
+    pthread_mutex_init(&self->keyboard_input.mutex, NULL);
 
     // Start the thread that listens for key presses.
     pthread_t thread_id;
-    pthread_create(&thread_id, NULL, read_input, &keyboard_input);
+    pthread_create(&thread_id, NULL, read_input, &self->keyboard_input);
   =}
 
-  reaction(keypress) -> key {=
-    lf_set(key, keypress->value);
+  reaction(check_for_event) -> key {=
+    if (self->keyboard_input.new_pressed) {
+      pthread_mutex_lock(&self->keyboard_input.mutex);
+      lf_set(key, self->keyboard_input.key_pressed);
+      self->keyboard_input.new_pressed = false;
+      pthread_mutex_unlock(&self->keyboard_input.mutex);
+    }
   =}
 
   reaction(shutdown) {=

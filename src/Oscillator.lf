@@ -70,6 +70,7 @@ reactor Oscillator(initialType: osc_type_t = {= OSC_SINE =}) {
   output samples: sample_buffer_t
   input type_in: osc_type_t
   input dead: bool
+  input do_sample: bool
 
   state phase: double = 0
   state freq: double = 0
@@ -81,12 +82,6 @@ reactor Oscillator(initialType: osc_type_t = {= OSC_SINE =}) {
   state sample_period: interval_t
   state sample_step: double
 
-  logical action a
-
-  reaction(startup) -> a {=
-    self->sample_period = SEC(SAMPLE_SIZE)/SAMPLE_RATE;
-    lf_schedule(a,self->sample_period);
-  =}
 
   reaction(freq_in) {=
     self->phase = 0;
@@ -103,7 +98,7 @@ reactor Oscillator(initialType: osc_type_t = {= OSC_SINE =}) {
     self->type = type_in->value;
   =}
 
-  reaction(a) -> samples, a {=
+  reaction(do_sample) -> samples {=
     sample_buffer_t _samples;
     if (self->on) {
       switch (self->type) {
@@ -122,7 +117,6 @@ reactor Oscillator(initialType: osc_type_t = {= OSC_SINE =}) {
       }
       lf_set(samples, _samples);
     }
-    lf_schedule(a, self->sample_period);
   =}
 
   reaction(dead) {=

@@ -1,0 +1,66 @@
+target uC
+
+preamble {=
+  #include "psynth.h"
+  #include <SDL.h>
+=}
+
+reactor SoundOutput {
+
+  input samples: sample_buffer_t
+  state audio_device: SDL_AudioDeviceID
+  state audio_spec: SDL_AudioSpec
+  state sample_log_file: FILE*
+
+
+  reaction(startup) {=
+    if (SDL_Init(SDL_INIT_AUDIO) < 0) {
+        fprintf(stderr, "Could not initialize SDL: %s\n", SDL_GetError());
+        exit(1);
+    }
+
+    SDL_zero(self->audio_spec);
+    self->audio_spec.freq = 44100;
+    self->audio_spec.format = AUDIO_F32;
+    self->audio_spec.channels = 1;
+    self->audio_spec.samples = 4096;
+    self->audio_spec.callback = NULL;
+    self->audio_spec.userdata = NULL;
+
+    self->audio_device = SDL_OpenAudioDevice(NULL, 0, &self->audio_spec, NULL, 0);
+    if (self->audio_device == 0) {
+        fprintf(stderr, "Failed to open audio: %s\n", SDL_GetError());
+        exit(1);
+    }
+
+    // Open the sample log file
+    // self->sample_log_file = fopen("sample_log.csv", "w");
+    // if (self->sample_log_file == NULL) {
+    //     fprintf(stderr, "Failed to open sample log file\n");
+    //     exit(1);
+    // }
+
+    SDL_PauseAudioDevice(self->audio_device, 0); // Start playing audio
+  =}
+
+  reaction(samples) {=
+    while (SDL_GetQueuedAudioSize(self->audio_device) > SAMPLE_NUM_BYTES) {}
+    SDL_QueueAudio(self->audio_device, samples->value.buffer, SAMPLE_NUM_BYTES);
+    //  for (int i = 0; i < SAMPLE_SIZE; i++) {
+    //     fprintf(self->sample_log_file, "%f\n", samples->value.buffer[i]);
+    // }
+  =}
+
+
+  reaction(shutdown) {=
+    // Close the sample log file
+    if (self->sample_log_file != NULL) {
+        fclose(self->sample_log_file);
+    }
+
+    // Clean up SDL
+    SDL_CloseAudioDevice(self->audio_device);
+    SDL_Quit();
+  =}
+  
+}

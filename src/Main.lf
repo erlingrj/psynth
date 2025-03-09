@@ -12,10 +12,11 @@ target uC {
       "../external/kissfft/libkissfft-float.a"],
   cmake-include: "lib/psynth.cmake",
   keepalive: true,
-  platform: Native
+  platform: Native,
+  fast: true
 }
 
-import SoundOutput from "SoundOutput.lf"
+import SoundOutput from "SoundOutputSDL.lf"
 import Synth from "Synth.lf"
 import CursesUserInterface as UserInterface from "UserInterface.lf"
 import Print from "Print.lf"
@@ -29,6 +30,7 @@ main reactor {
   out = new SoundOutput()
   ui = new UserInterface()
   ui.midi_event -> synth.midi_event
+  synth.check_for_event -> ui.check_for_event
   // // Printing and creating waveforms. Just for debug
   // tprint1 = new Print(filename="t1.csv", pg_name="t1.gp", only_last=true)
   // synth.samples -> tprint1.tsamples

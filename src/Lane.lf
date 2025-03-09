@@ -10,11 +10,13 @@ preamble {=
 reactor Lane(bank_index: int = 0) {
   input note_on: midi_note_on_t
   input note_off: midi_note_off_t
+  input do_sample: bool
   input ctrl: midi_controller_change_t
   output samples: sample_buffer_t
   output dead: bool
 
   osc = new Oscillator(initialType = {= OSC_SINE =})
+  do_sample -> osc.do_sample
   envelope = new ADSREnvelope()
   osc.samples -> envelope.samples_raw
   envelope.samples -> samples

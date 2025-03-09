@@ -10,7 +10,7 @@ reactor UserInterface {
   preamble {=
     #include <stdio.h>
   =}
-  input samples: sample_buffer_t*
+  input check_for_event: bool
   output midi_event: midi_base_msg_t
 }
 
@@ -121,6 +121,8 @@ reactor CursesUserInterface extends UserInterface {
   logical action modulate: int
   logical action note_on: int
 
+  check_for_event -> keyboard.check_for_event
+
   reaction(startup) {=
     self->key_pressed = (bool *) malloc(NOTE_G9*sizeof(bool));
     self->key_pressed_next = (bool *) malloc(NOTE_G9*sizeof(bool));
@@ -142,6 +144,7 @@ reactor CursesUserInterface extends UserInterface {
     int note = -1;
     int program = -1;
     int filter = -1;
+    midi_base_msg_t midi;
 
     switch(keyboard.key->value) {
         case 'a':
@@ -240,31 +243,37 @@ reactor CursesUserInterface extends UserInterface {
 
     if (note >= 0) {
         if (self->key_pressed[note]) {
-            midi_note_on_t temp = MIDI_NOTE_OFF(note);
+            midi_note_off_t temp = MIDI_NOTE_OFF(note);
+            memcpy(&midi, &temp, sizeof(temp));
             self->key_pressed[note] = false;
-            lf_set(midi_event, temp);
+            lf_set(midi_event,  midi);
         } else {
             midi_note_on_t temp = MIDI_NOTE_ON(note);
+            memcpy(&midi, &temp, sizeof(temp));
             self->key_pressed[note] = true;
-            lf_set(midi_event, temp);
+            lf_set(midi_event,  midi);
         }
     } else if (program >= 0) {
         midi_controller_change_t temp = MIDI_OSC_CHANGE(program);
+        memcpy(&midi, &temp, sizeof(temp));
         self->program = program;
-        lf_set(midi_event, temp);
+        lf_set(midi_event,  midi);
     } else if (filter >= 0) {
         midi_controller_change_t temp = MIDI_FILTER_CUTOFF(filter);
+        memcpy(&midi, &temp, sizeof(temp));
         self->filter_cutoff = filter;
-        lf_set(midi_event, temp);
+        lf_set(midi_event,  midi);
     }
   =}
 
   reaction(killall) -> killall, midi_event {=
+    midi_base_msg_t midi;
     for (int i=0; i<NOTE_G9; i++) {
         if (self->key_pressed[i]) {
-            midi_note_on_t temp = MIDI_NOTE_OFF(i);
+            midi_note_off_t temp = MIDI_NOTE_OFF(i);
+            memcpy(&midi, &temp, sizeof(temp));
             self->key_pressed[i] = false;
-            lf_set(midi_event, temp);
+            lf_set(midi_event,  midi);
             lf_schedule(killall, 0);
             return;
         }
@@ -272,23 +281,28 @@ reactor CursesUserInterface extends UserInterface {
   =}
 
   reaction(note_on) -> midi_event {=
+    midi_base_msg_t midi;
     midi_note_on_t temp = MIDI_NOTE_ON(note_on->value);
-    lf_set(midi_event, temp);
+    memcpy(&midi, &temp, sizeof(temp));
+
+    lf_set(midi_event,  midi);
   =}
 
   reaction(modulate) -> note_on, midi_event, modulate {=
+    midi_base_msg_t midi;
     for (int i=0; i<NOTE_G9; i++) {
         if (self->key_pressed[i]) {
             midi_note_on_t temp = MIDI_NOTE_OFF(i);
+            memcpy(&midi, &temp, sizeof(temp));
             self->key_pressed[i] = false;
             int modulated_tone = i + modulate->value;
             if (modulated_tone < 0) modulated_tone=0;
             if (modulated_tone > NOTE_G9) modulated_tone=NOTE_G9;
 
             self->key_pressed_next[modulated_tone] = true;
-            lf_set(midi_event, temp);
+            lf_set(midi_event,  midi);
             lf_schedule(note_on, 0, modulated_tone);
-            lf_schedule(modulate, 1, modulate->value); // TODO: Why 1 nsec delay?
+            lf_schedule(modulate, 1, modulate->value);
             return;
         }
     }
